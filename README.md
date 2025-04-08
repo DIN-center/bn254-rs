@@ -2,15 +2,25 @@
 
 A Rust implementation of BN254 curve operations that mirrors EigenLayer's BN254.sol library.
 
-### Current Issue
+## Project Status
 
-The Rust and Solidity implementations of scalar multiplication (`scalar_mul`) appear to match when tested directly via `proptest`. However, **attempts to replay transactions using `txtx` output fail** — likely due to format mismatch or incorrect field interpretation.
+⚠️ **Current Status**: **Experimental/In Development**
 
-### How to Run Tests
+The library is currently in development with the following status:
+- ✅ Basic BN254 operations implemented and tested
+- ✅ Property-based tests passing for scalar multiplication
+- ❌ **Known Issue**: Transaction replay using `txtx` output fails
+  - Likely due to format mismatch or incorrect field interpretation
+  - Investigation in progress
 
-We define a cargo alias for convenience:
+### Quick Start
 
 ```bash
+# Add to Cargo.toml
+[dependencies]
+bn254-rs = "0.1.0"  # Replace with actual version
+
+# Run tests
 cargo test-fuzz      # Run only the randomized fuzz tests
 ```
 
@@ -56,14 +66,6 @@ This library serves as a foundation for building a complete Rust-based pipeline 
 - **Pairing Operations**: Bilinear pairing checks between G1 and G2 points
 - **Hashing**: Keccak-256 hashing of G1 points
 - **Utilities**: Conversion between field elements and byte representations
-
-## Modules
-
-- **g1.rs**: Operations on the G1 group of the BN254 curve
-- **g2.rs**: Operations on the G2 group of the BN254 curve
-- **pairing.rs**: Bilinear pairing operations between G1 and G2 points
-- **hash.rs**: Hashing operations for curve points
-- **utils.rs**: Utility functions for working with field elements
 
 ## Usage
 
@@ -131,10 +133,106 @@ let field_element = Fr::from(123u64);
 let bytes = fr_to_be_bytes(&field_element);
 ```
 
+## Technical Implementation Details
+
+### Solidity ↔ Rust Mapping
+
+#### Solidity Side
+
+Solidity uses a custom `BN254` library with types and methods like:
+
+```solidity
+struct G1Point {
+    uint256 X;
+    uint256 Y;
+}
+
+function scalar_mul(G1Point memory p, uint256 s) internal view returns (G1Point memory r)
+```
+
+These are **affine points** over the BN254 G1 curve:
+- `X`, `Y`: elements of Fq (field modulus `FP_MODULUS`)
+- `s`: scalar in Fr (field modulus `FR_MODULUS`)
+
+Returned value (e.g. `sig_out`) is encoded as `abi.encodePacked(p.X, p.Y)` — a 64-byte array: X || Y.
+
+#### Rust Side
+
+We use `ark_bn254` primitives:
+
+```rust
+use ark_bn254::{Fq, Fr, G1Affine, G1Projective};
+```
+
+Mapping of Solidity constructs:
+| Solidity                | Rust Equivalent                     | Notes                                                  |
+|-------------------------|-------------------------------------|--------------------------------------------------------|
+| `uint256` (Fr)          | `Fr::from_str(...)?`                | Parse from decimal string                              |
+| `uint256` (Fq)          | `Fq::from_str(...)?`                | Parse from decimal string                              |
+| `G1Point`               | `G1Affine::new_unchecked(Fq, Fq)`   | Rust affine curve point                                |
+| `scalar_mul(p, s)`      | `G1Projective::from(p).mul(s)`      | Scalar multiplication, converted back to affine        |
+| ABI-encoded result      | `hex::decode(sig_out)` → [u8; 64]   | Decode X and Y from ABI output (big-endian byte order) |
+
+### Data Assumptions
+
+1. All numeric values (scalars and coordinates) are given as **decimal strings**.
+2. `sig_out.value` is a **64-byte ABI-encoded result**: `X || Y` where each is 32 bytes, big-endian.
+3. `pubkey_registration_message_hash.value` is a **nested JSON** array encoded as hex (e.g., `Vec<Vec<u8>>`).
+
+### Validation Strategy
+
+#### Property-Based Testing
+
+We run a `proptest` loop in Rust to validate scalar multiplication across 1000+ randomly generated scalars. Each test:
+- Uses the **G1 generator** as the input point
+- Applies scalar multiplication in Rust
+- Calls the Solidity contract's `scalar_mul` with the same inputs
+- Asserts equality of the resulting affine coordinates (x, y)
+
+We also test edge cases:
+- Scalar = 0
+- Scalar = 1
+- Scalar = -1
+- Scalar = 2
+
+All edge cases and fuzzed scalars passed, confirming behavioral equivalence of the Solidity and Rust implementations.
+
+## Known Issues and Next Steps
+
+### Current Issues
+
+While the scalar multiplication logic works perfectly when directly driven through the Solidity interface, **attempts to simulate the transaction using the `txtx` tool output have failed**.
+
+Symptoms:
+- No points are validated or passed through correctly
+- It's unclear whether the format mismatch lies in how the call is encoded or how `sig_out` is extracted
+
+### Next Steps
+
+1. **Immediate Tasks**:
+   - Compare direct call encoding against `txtx`-generated calldata
+   - Verify the `result` vs `abi_encoded_result` on `sig_out`
+   - Confirm ordering and layout of calldata and return data
+
+2. **Future Improvements**:
+   - Add more comprehensive error handling
+   - Improve documentation of edge cases
+   - Add benchmarks for performance comparison
+   - Implement additional test cases
+
+> **Debugging Tip**: To see the actual Solidity return bytes, inspect `.result`, not `.abi_encoded_result`. The latter may contain meta-formatting or embedded type descriptors.
+
+## Modules
+
+- **g1.rs**: Operations on the G1 group of the BN254 curve
+- **g2.rs**: Operations on the G2 group of the BN254 curve
+- **pairing.rs**: Bilinear pairing operations between G1 and G2 points
+- **hash.rs**: Hashing operations for curve points
+- **utils.rs**: Utility functions for working with field elements
+
 ## Relationship to EigenLayer's BN254.sol
 
 This library is designed to be a direct Rust counterpart to EigenLayer's BN254.sol Solidity library. It implements the same operations and follows the same mathematical principles, making it suitable for computing signing proof for `registerForOperatorSet`. Note: This is not verified, and this repo is spike to test if it is viable.
-
 
 ## Dependencies
 
@@ -142,11 +240,34 @@ This library is designed to be a direct Rust counterpart to EigenLayer's BN254.s
 - [ark-ec](https://github.com/arkworks-rs/algebra): Provides elliptic curve operations
 - [ark-ff](https://github.com/arkworks-rs/algebra): Provides finite field operations
 - [sha3](https://crates.io/crates/sha3): Provides Keccak-256 hashing
+- [hex](https://crates.io/crates/hex): For hex encoding/decoding
+- [serde_json](https://crates.io/crates/serde_json): For JSON serialization
+- [proptest](https://crates.io/crates/proptest): For property-based testing
+
+## Development
+
+### Setup
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   cargo build
+   ```
+3. Run tests:
+   ```bash
+   cargo test
+   cargo test-fuzz  # For property-based tests
+   ```
+
+### Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. When contributing:
+
+1. Ensure all tests pass
+2. Add tests for new functionality
+3. Update documentation as needed
+4. Follow the existing code style
 
 ## License
 
 This project is licensed under the [MIT license](./LICENSE.md).
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
