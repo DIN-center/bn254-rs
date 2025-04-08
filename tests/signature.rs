@@ -1,109 +1,77 @@
 use ark_bn254::{Fq, Fr, G1Affine, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
-use ethers::abi::{decode, ParamType, Token};
 use hex;
 use serde::Deserialize;
 use std::error::Error;
 use std::fs;
 use std::ops::Mul;
-use std::str::FromStr;
 
-/// This test deserializes a scalar multiplication output from a Solidity contract
-/// and checks whether the result matches the same operation performed in Rust using arkworks.
-///
-/// FORMAT ASSUMPTIONS:
-/// - `priv_key`, `g1_x`, `g1_y` are uint256 **decimal strings**
-/// - `sig_out.value` is the hex-encoded `.result` from a Solidity function returning `(uint256 x, uint256 y)`
-/// - `pubkey_registration_message_hash.value` is hex-encoded JSON (UTF-8) of `Vec<Vec<u8>>`
+#[derive(Debug, Deserialize)]
+struct Wrapper {
+    for_testing: ForTesting,
+}
+
+#[derive(Debug, Deserialize)]
+struct ForTesting {
+    value: SignatureTestInput,
+}
 
 #[derive(Debug, Deserialize)]
 struct SignatureTestInput {
+    g1: [String; 2],
+    g2: [[String; 2]; 2],
     priv_key: String,
-    g1_x: String,
-    g1_y: String,
-    sig_out: HexJsonBlob,
-    pubkey_registration_message_hash: HexJsonBlob,
+    sig_out: String,
+    call_pubkey_registration_message_hash_result: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct HexJsonBlob {
-    value: String,
+fn fq_from_hex(s: &str) -> Result<Fq, Box<dyn Error>> {
+    let bytes = hex::decode(s.trim_start_matches("0x"))?;
+    Ok(Fq::from_be_bytes_mod_order(&bytes))
 }
 
-/// Parse Fr from decimal string (Solidity uint256)
-fn parse_decimal_fr(s: &str) -> Result<Fr, Box<dyn Error>> {
-    Fr::from_str(s).map_err(|_| "Invalid decimal Fr".into())
+fn fr_from_hex(s: &str) -> Result<Fr, Box<dyn Error>> {
+    let bytes = hex::decode(s.trim_start_matches("0x"))?;
+    Ok(Fr::from_be_bytes_mod_order(&bytes))
 }
 
-/// Parse Fq from decimal string (Solidity uint256)
-fn parse_decimal_fq(s: &str) -> Result<Fq, Box<dyn Error>> {
-    Fq::from_str(s).map_err(|_| "Invalid decimal Fq".into())
-}
-
-/// Decode ABI-encoded `(uint256 x, uint256 y)` returned from Solidity as `G1Point`
-fn decode_abi_g1_point(hex_str: &str) -> Result<G1Affine, Box<dyn Error>> {
-    let raw = hex::decode(hex_str.trim_start_matches("0x"))?;
-    let tokens = decode(&[ParamType::Uint(256), ParamType::Uint(256)], &raw)?;
-
-    let x = match &tokens[0] {
-        Token::Uint(x) => {
-            let mut buf = [0u8; 32];
-            x.to_big_endian(&mut buf);
-            Fq::from_be_bytes_mod_order(&buf)
-        }
-        _ => return Err("Expected Uint for X".into()),
-    };
-
-    let y = match &tokens[1] {
-        Token::Uint(y) => {
-            let mut buf = [0u8; 32];
-            y.to_big_endian(&mut buf);
-            Fq::from_be_bytes_mod_order(&buf)
-        }
-        _ => return Err("Expected Uint for Y".into()),
-    };
-
+fn g1_from_abi_encoded_hex(s: &str) -> Result<G1Affine, Box<dyn Error>> {
+    let bytes = hex::decode(s.trim_start_matches("0x"))?;
+    if bytes.len() != 64 {
+        return Err("Expected 64-byte ABI-encoded G1Point".into());
+    }
+    let x = Fq::from_be_bytes_mod_order(&bytes[..32]);
+    let y = Fq::from_be_bytes_mod_order(&bytes[32..]);
     Ok(G1Affine::new_unchecked(x, y))
 }
 
-/// Decode hex string containing UTF-8 JSON-encoded nested Vec<Vec<u8>>
-fn parse_nested_u8_array_from_hex_json(s: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    let decoded = hex::decode(s.trim_start_matches("0x"))?;
-    let json_str = std::str::from_utf8(&decoded)?;
-    let nested: Vec<Vec<u8>> = serde_json::from_str(json_str)?;
-    Ok(nested.into_iter().flatten().collect())
-}
-
 #[test]
-fn test_scalar_mul_signature() -> Result<(), Box<dyn Error>> {
-    // Read JSON input exported from txtx runbook
+fn test_scalar_mul_signature_from_txtx() -> Result<(), Box<dyn Error>> {
     let data = fs::read_to_string("testdata/sign.json")?;
-    let input: SignatureTestInput = serde_json::from_str(&data)?;
+    let wrapper: Wrapper = serde_json::from_str(&data)?;
+    let input = wrapper.for_testing.value;
 
-    // Parse scalar and coordinates
-    let priv_key = parse_decimal_fr(&input.priv_key)?;
-    let g1_x = parse_decimal_fq(&input.g1_x)?;
-    let g1_y = parse_decimal_fq(&input.g1_y)?;
-    let point = G1Affine::new_unchecked(g1_x, g1_y);
+    let g1_x = fq_from_hex(&input.g1[0])?;
+    let g1_y = fq_from_hex(&input.g1[1])?;
+    let priv_key = fr_from_hex(&input.priv_key)?;
+    let base_point = G1Affine::new_unchecked(g1_x, g1_y);
+    let expected = G1Projective::from(base_point).mul(priv_key).into_affine();
 
-    // Scalar multiplication in Rust
-    let result = G1Projective::from(point).mul(priv_key).into_affine();
-    println!("\n--- Scalar mul result ---\n{:?}\n", result);
+    println!("--- Scalar multiplication result ---\n{:?}", expected);
 
-    // Decode Solidity output as ABI-encoded G1Point (uint256 x, uint256 y)
-    let expected = decode_abi_g1_point(&input.sig_out.value)?;
-    println!(
-        "--- Solidity sig_out (decoded G1Point) ---\n{:?}\n",
-        expected
+    let sig_out_point = g1_from_abi_encoded_hex(&input.sig_out)?;
+    let call_result_point =
+        g1_from_abi_encoded_hex(&input.call_pubkey_registration_message_hash_result)?;
+
+    println!("\n--- sig_out decoded G1 ---\n{:?}", sig_out_point);
+    println!("--- call_result decoded G1 ---\n{:?}", call_result_point);
+
+    assert_eq!(expected, sig_out_point, "Mismatch with sig_out");
+    assert_eq!(
+        expected, call_result_point,
+        "Mismatch with call_pubkey_registration_message_hash_result"
     );
-
-    // Validate
-    assert_eq!(result, expected, "Signature mismatch");
-
-    // Optional sanity check: decode the pubkey registration message hash
-    let _message_hash =
-        parse_nested_u8_array_from_hex_json(&input.pubkey_registration_message_hash.value)?;
 
     Ok(())
 }

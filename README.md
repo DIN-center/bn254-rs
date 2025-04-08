@@ -9,9 +9,24 @@ A Rust implementation of BN254 curve operations that mirrors EigenLayer's BN254.
 The library is currently in development with the following status:
 - ✅ Basic BN254 operations implemented and tested
 - ✅ Property-based tests passing for scalar multiplication
-- ❌ **Known Issue**: Transaction replay using `txtx` output fails
-  - Likely due to format mismatch or incorrect field interpretation
-  - Investigation in progress
+- ✅ Solidity and Rust agree on scalar multiplication outputs
+- ❌ **sig_out mismatch**:
+  - We generated a custom `for_testing` output via `txtx` in `operator/step-5`
+    ```hcl2
+    output "for_testing" {
+      value = {
+        g1 = variable.g1
+        g2 = variable.g2
+        priv_key = evm::uint256(input.priv_key)
+        call_pubkey_registration_message_hash_result = action.call_pubkey_registration_message_hash.result
+        sig_out = action.scalar_mul.result
+      }
+    }
+    ```
+  - Rust scalar multiplication matches `cast call` results directly from Solidity
+  - But `sig_out` returned by `txtx` **does not match** the actual contract
+  call output suggesting we should investigate `sig_out`s provinance
+
 
 ### Quick Start
 
