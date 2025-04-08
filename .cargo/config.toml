@@ -1,0 +1,2 @@
+[alias]
+test-fuzz = "test --test prop_scalar_mul -- --nocapture"

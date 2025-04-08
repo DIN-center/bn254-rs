@@ -2,6 +2,18 @@
 
 A Rust implementation of BN254 curve operations that mirrors EigenLayer's BN254.sol library.
 
+### Current Issue
+
+The Rust and Solidity implementations of scalar multiplication (`scalar_mul`) appear to match when tested directly via `proptest`. However, **attempts to replay transactions using `txtx` output fail** — likely due to format mismatch or incorrect field interpretation.
+
+### How to Run Tests
+
+We define a cargo alias for convenience:
+
+```bash
+cargo test-fuzz      # Run only the randomized fuzz tests
+```
+
 ## Overview
 
 This library provides a Rust implementation of the BN254 elliptic curve operations, designed to be compatible with EigenLayer's [BN254.sol](https://github.com/Layr-Labs/eigenlayer-middleware/blob/dev/src/libraries/BN254.sol) Solidity library. It offers the following operations for working with points on the BN254 curve:
