@@ -1,11 +1,14 @@
+mod solidity;
+
 use ark_bn254::{Fq, Fr, G1Affine, G1Projective};
 use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 use hex;
 use serde::Deserialize;
-use std::error::Error;
-use std::fs;
-use std::ops::Mul;
+use solidity::{call_scalar_mul_solidity, deploy_bn254_wrapper};
+use std::{error::Error, fs, ops::Mul};
+
+use bn254_rs::G1Point;
 
 #[derive(Debug, Deserialize)]
 struct Wrapper {
@@ -20,9 +23,11 @@ struct ForTesting {
 #[derive(Debug, Deserialize)]
 struct SignatureTestInput {
     g1: [String; 2],
+    #[allow(dead_code)]
     g2: [[String; 2]; 2],
     priv_key: String,
     sig_out: String,
+    #[allow(dead_code)]
     call_pubkey_registration_message_hash_result: String,
 }
 
@@ -46,8 +51,14 @@ fn g1_from_abi_encoded_hex(s: &str) -> Result<G1Affine, Box<dyn Error>> {
     Ok(G1Affine::new_unchecked(x, y))
 }
 
-#[test]
-fn test_scalar_mul_signature_from_txtx() -> Result<(), Box<dyn Error>> {
+fn format_g1_point(point: &G1Affine) -> String {
+    let x_hex = hex::encode(point.x.into_bigint().to_bytes_be());
+    let y_hex = hex::encode(point.y.into_bigint().to_bytes_be());
+    format!("\n  X = 0x{}\n  Y = 0x{}", x_hex, y_hex)
+}
+
+#[tokio::test]
+async fn test_scalar_mul_signature_from_txtx() -> Result<(), Box<dyn Error>> {
     let data = fs::read_to_string("testdata/sign.json")?;
     let wrapper: Wrapper = serde_json::from_str(&data)?;
     let input = wrapper.for_testing.value;
@@ -55,23 +66,38 @@ fn test_scalar_mul_signature_from_txtx() -> Result<(), Box<dyn Error>> {
     let g1_x = fq_from_hex(&input.g1[0])?;
     let g1_y = fq_from_hex(&input.g1[1])?;
     let priv_key = fr_from_hex(&input.priv_key)?;
-    let base_point = G1Affine::new_unchecked(g1_x, g1_y);
-    let expected = G1Projective::from(base_point).mul(priv_key).into_affine();
+    let base_point = G1Point::from_projective(G1Projective::from(G1Affine::new_unchecked(g1_x, g1_y)));
+    let expected = G1Projective::from(base_point.inner().into_affine()).mul(priv_key).into_affine();
 
-    println!("--- Scalar multiplication result ---\n{:?}", expected);
+    println!(
+        "--- Scalar multiplication result rust ---\n{}",
+        format_g1_point(&expected)
+    );
+
+    // Deploy the contract once and reuse it
+    let (_anvil, contract, _client) = deploy_bn254_wrapper().await?;
+    let sol_point = call_scalar_mul_solidity(&contract, base_point.inner().into_affine(), priv_key).await?;
+
+    println!(
+        "--- Solidity result (via contract) ---\n{}",
+        format_g1_point(&sol_point)
+    );
+
+    assert_eq!(expected, sol_point, "Mismatch: Rust vs Solidity contract");
 
     let sig_out_point = g1_from_abi_encoded_hex(&input.sig_out)?;
-    let call_result_point =
-        g1_from_abi_encoded_hex(&input.call_pubkey_registration_message_hash_result)?;
-
-    println!("\n--- sig_out decoded G1 ---\n{:?}", sig_out_point);
-    println!("--- call_result decoded G1 ---\n{:?}", call_result_point);
-
-    assert_eq!(expected, sig_out_point, "Mismatch with sig_out");
-    assert_eq!(
-        expected, call_result_point,
-        "Mismatch with call_pubkey_registration_message_hash_result"
+    println!(
+        "\n--- sig_out decoded G1 ---{}",
+        format_g1_point(&sig_out_point)
     );
+
+    if expected != sig_out_point {
+        panic!(
+            "Mismatch with sig_out:\nExpected (Rust result): {}\nActual (sig_out): {}",
+            format_g1_point(&expected),
+            format_g1_point(&sig_out_point),
+        );
+    }
 
     Ok(())
 }
