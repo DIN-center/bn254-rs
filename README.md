@@ -10,13 +10,11 @@ The library is currently in development with the following status:
 - ✅ Basic BN254 operations implemented and tested
 - ✅ Property-based tests passing for scalar multiplication
 - ✅ Solidity and Rust agree on scalar multiplication outputs
-- ❌ **sig_out mismatch**:
+- ✅ **BLS handshake verified**: msg_hash * priv_key = sig_out
   - We generated a custom `for_testing` output via `txtx` in `operator/step-5`
     ```hcl2
     output "for_testing" {
       value = {
-        g1 = variable.g1
-        g2 = variable.g2
         priv_key = evm::uint256(input.priv_key)
         call_pubkey_registration_message_hash_result = action.call_pubkey_registration_message_hash.result
         sig_out = action.scalar_mul.result
@@ -24,8 +22,8 @@ The library is currently in development with the following status:
     }
     ```
   - Rust scalar multiplication matches `cast call` results directly from Solidity
-  - But `sig_out` returned by `txtx` **does not match** the actual contract
-  call output suggesting we should investigate `sig_out`s provinance
+  - Successfully verified the BLS handshake process with EigenLayer's contract
+  - The library now correctly reproduces the same signatures accepted by EigenLayer
 
 
 ### Quick Start
@@ -273,7 +271,30 @@ This library is designed to be a direct Rust counterpart to EigenLayer's BN254.s
    cargo test
    cargo test-fuzz  # For property-based tests
    ```
+4. Debug / Observe scalar math on chain
+   1. Start Anvil
+      ```bash
+      anvil
+      ```
+   2. Deploy BN254Wrapper contract
+      ```bash
+      PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+      forge script script/DeployBN254Wrapper.s.sol \
+        --rpc-url http://localhost:8545 \
+        --broadcast 
+      ```
+   3. Interact with the contract
+      ```console
+      # call_pubkey_registration_message_hash_result: a G1 point (uint256,uint256)
+      # 2c1619993b1ae6dcb33661d64742b2b7336a90c3db7dfaba6eb691d98fea060a 0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06",
+      # G1.X: 0x2c1619993b1ae6dcb33661d64742b2b7336a90c3db7dfaba6eb691d98fea060a 
+      # G!.Y: 0x0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06
 
+      cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
+        "scalar_mul((uint256,uint256),uint256)((uint256,uint256))" \
+        "(0x2c1619993b1ae6dcb33661d64742b2b7336a90c3db7dfaba6eb691d98fea060a, 0x0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06)" \
+        0xffe3be6f94645e9216938adbaa5e621cd4afd69ffd75fb433498ca18866b248c
+      ```
 ### Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. When contributing:
