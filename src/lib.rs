@@ -27,6 +27,7 @@ pub mod g2;
 pub mod pairing;
 pub mod hash;
 pub mod utils;
+pub mod web;
 
 // Re-export the main types
 pub use g1::{G1Point, g1_generator, g1_negate, g1_add, g1_scalar_mul};
