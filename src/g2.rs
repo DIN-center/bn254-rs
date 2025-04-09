@@ -54,6 +54,7 @@ impl G2Point {
     /// ```
     /// use bn254_rs::G2Point;
     /// use ark_bn254::G2Projective;
+    /// use ark_ec::Group;
     /// 
     /// let g = G2Projective::generator();
     /// let point = G2Point::from_projective(g);
