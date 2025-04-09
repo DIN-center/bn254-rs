@@ -65,6 +65,7 @@ impl G1Point {
     /// ```
     /// use bn254_rs::G1Point;
     /// use ark_bn254::G1Projective;
+    /// use ark_ec::Group;
     /// 
     /// let g = G1Projective::generator();
     /// let point = G1Point::from_projective(g);
