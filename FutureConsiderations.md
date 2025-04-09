@@ -1,50 +1,56 @@
-# Future Considerations for Key Management Service
+# Future Considerations
 
-This document outlines security audit findings and future considerations for enhancing the Key Management Service.
+## Overview
 
-## Security Audit Considerations
+This document outlines the security roadmap and future enhancements for the Key Management Service, including:
+- Security audit findings
+- Implementation roadmap
+- Scalability considerations
+- Technical terminology
 
-### Critical Security Recommendations
+## Security Audit
 
-1. **Access Control and Authentication**
-   - Implement strong mutual TLS (mTLS) between all service components
-   - Add rate limiting for all API endpoints to prevent DoS attacks
-   - Require multi-factor authentication for operator access
-   - Implement role-based access control (RBAC) for administrative functions
-   - Add IP allowlisting for operator connections
+### Critical Recommendations
 
-2. **Key Management Hardening**
-   - Implement key usage limits and automatic rotation triggers
-   - Add entropy monitoring during key generation
-   - Implement secure key deletion procedures with verification
-   - Add hardware security module (HSM) support for root keys
-   - Implement key backup procedures with geographical distribution
-   - Add version control for key metadata
+#### Access Control
+- Implement strong mutual TLS (mTLS)
+- Add rate limiting for API endpoints
+- Require multi-factor authentication
+- Implement role-based access control (RBAC)
+- Add IP allowlisting
 
-3. **Secure Enclave Enhancement**
-   - Regular security patches and updates policy
-   - Implement secure boot and attestation
-   - Add runtime integrity monitoring
-   - Implement memory encryption for all key material
-   - Add secure audit logging for all key operations
-   - Implement secure error handling to prevent information leakage
+#### Key Management
+- Implement key usage limits
+- Add entropy monitoring
+- Implement secure key deletion
+- Add HSM support
+- Implement key backup procedures
+- Add version control for metadata
 
-4. **Monitoring and Incident Response**
-   - Add real-time alerting for suspicious activities
-   - Implement automated response procedures for potential breaches
-   - Add comprehensive audit logging with tamper detection
-   - Create incident response playbooks
-   - Implement automated backup verification
-   - Add regular security scanning and penetration testing procedures
+#### Secure Enclave
+- Regular security patches
+- Implement secure boot
+- Add runtime integrity monitoring
+- Implement memory encryption
+- Add secure audit logging
+- Implement secure error handling
 
-5. **Compliance and Standards**
-   - Align with NIST SP 800-57 key management guidelines
-   - Implement FIPS 140-3 compliance where applicable
-   - Add support for regulatory reporting requirements
-   - Create key ceremony procedures and documentation
-   - Implement secure key destruction procedures meeting regulatory requirements
+#### Monitoring
+- Real-time alerting
+- Automated response procedures
+- Comprehensive audit logging
+- Incident response playbooks
+- Automated backup verification
+- Regular security scanning
 
-## Enhanced Security Architecture
+#### Compliance
+- Align with NIST SP 800-57
+- Implement FIPS 140-3 compliance
+- Add regulatory reporting
+- Create key ceremony procedures
+- Implement secure key destruction
+
+## Enhanced Architecture
 
 ```mermaid
 flowchart TB
@@ -103,98 +109,105 @@ flowchart TB
     class MFA,MONITOR,HSM security
 ```
 
-## Risk Assessment Matrix
+## Risk Assessment
 
 | Risk Category | Threat | Impact | Mitigation |
 |--------------|--------|---------|------------|
-| Key Exposure | Unauthorized access to private keys | Critical | HSM, secure enclave, access controls |
-| Service Availability | DoS attacks | High | Rate limiting, load balancing, monitoring |
-| Authentication | Impersonation attacks | Critical | MFA, mTLS, IP allowlisting |
-| Data Integrity | Tampering with key metadata | High | Audit logging, integrity monitoring |
-| Compliance | Regulatory violations | High | Standards alignment, documentation |
+| Key Exposure | Unauthorized access | Critical | HSM, secure enclave |
+| Service Availability | DoS attacks | High | Rate limiting, WAF |
+| Authentication | Impersonation | Critical | MFA, mTLS |
+| Data Integrity | Tampering | High | Audit logging |
+| Compliance | Regulatory violations | High | Standards alignment |
 
 ## Implementation Roadmap
 
-### Phase 1 - Critical Security Features
-- Implement HSM integration for root key protection
-- Add comprehensive audit logging
-- Deploy MFA for all operator access
-- Implement mTLS between all components
+### Phase 1: Critical Security
+- HSM integration
+- Comprehensive audit logging
+- MFA implementation
+- mTLS deployment
 
-### Phase 2 - High Priority Enhancements
-- Deploy WAF and rate limiting
-- Implement automated monitoring
-- Create incident response procedures
-- Add key backup procedures
+### Phase 2: High Priority
+- WAF and rate limiting
+- Automated monitoring
+- Incident response
+- Key backup procedures
 
-### Phase 3 - Operational Improvements
-- Develop compliance documentation
-- Implement key ceremony procedures
-- Add geographic redundancy
-- Create operator security guidelines
+### Phase 3: Operational
+- Compliance documentation
+- Key ceremony procedures
+- Geographic redundancy
+- Security guidelines
 
-## Future Scalability Considerations
+## Scalability
 
-1. **Multi-Region Support**
-   - Geographical distribution of key storage
-   - Region-specific compliance handling
-   - Cross-region synchronization
+### Multi-Region Support
+- Geographical distribution
+- Region-specific compliance
+- Cross-region synchronization
 
-2. **Enterprise Features**
-   - Multi-tenant support
-   - Custom key rotation policies
-   - Integration with enterprise identity providers
-   - Advanced reporting and analytics
+### Enterprise Features
+- Multi-tenant support
+- Custom key rotation
+- Identity provider integration
+- Advanced analytics
 
-3. **Automation and DevOps**
-   - Automated deployment procedures
-   - CI/CD pipeline security
-   - Infrastructure as Code templates
-   - Automated security testing
+### Automation
+- Automated deployment
+- CI/CD security
+- Infrastructure as Code
+- Security testing
 
-4. **Ecosystem Integration**
-   - Support for additional AVS providers
-   - Standardized API for third-party integration
-   - Plugin system for custom security modules
+### Ecosystem
+- Additional AVS support
+- Standardized API
+- Security module plugins
 
 ## Glossary
 
-### Security Components and Protocols
+### Security Components
 
-- **HSM (Hardware Security Module)**
-  - A physical computing device that safeguards and manages digital keys
-  - Provides tamper-evident, tamper-resistant protection for cryptographic operations
-  - Typically FIPS 140-2/3 certified for high-security environments
-  - Used for storing root keys and performing critical cryptographic operations
+#### HSM (Hardware Security Module)
+- Physical device for key management
+- Tamper-evident protection
+- FIPS 140-2/3 certified
+- Root key storage
 
-- **mTLS (Mutual Transport Layer Security)**
-  - Enhanced version of TLS where both client and server authenticate each other
-  - Both parties present digital certificates to prove their identity
-  - Prevents man-in-the-middle attacks and unauthorized service access
-  - Essential for secure service-to-service communication
+#### mTLS (Mutual Transport Layer Security)
+- Two-way authentication
+- Certificate-based identity
+- Man-in-the-middle protection
+- Secure service communication
 
-- **WAF (Web Application Firewall)**
-  - Security tool that filters and monitors HTTP/HTTPS traffic
-  - Protects web applications from common attacks like SQL injection, XSS
-  - Can implement rate limiting and DDoS protection
-  - Provides real-time security monitoring and alerting
+#### WAF (Web Application Firewall)
+- HTTP/HTTPS traffic filtering
+- Common attack protection
+- Rate limiting
+- Security monitoring
 
-### Other Technical Terms
+### Technical Terms
 
-- **RBAC (Role-Based Access Control)**
-  - Security model that restricts system access based on roles
-  - Enables granular permission management
-  - Simplifies access management for large organizations
+#### RBAC (Role-Based Access Control)
+- Role-based permissions
+- Granular access management
+- Organizational security
 
-- **DDoS (Distributed Denial of Service)**
-  - Attack that attempts to overwhelm services with traffic
-  - Mitigated through rate limiting and WAF protection
+#### DDoS (Distributed Denial of Service)
+- Traffic-based attacks
+- WAF protection
+- Rate limiting
 
-- **FIPS (Federal Information Processing Standards)**
-  - U.S. government security standards for cryptographic modules
-  - FIPS 140-3 is the current standard for cryptographic security
+#### FIPS (Federal Information Processing Standards)
+- US government standards
+- Cryptographic security
+- FIPS 140-3 compliance
 
-- **MPC (Multi-Party Computation)**
-  - Cryptographic technique allowing multiple parties to compute together
-  - Enables secure computation without revealing individual inputs
-  - Used for distributed key generation and management 
+#### MPC (Multi-Party Computation)
+- Distributed computation
+- Secure input handling
+- Key generation
+
+## Related Documentation
+- [Key Management Service](KeyManagement.md)
+- [API Reference](../src/web/README.md)
+- [BN254 Library](../README.md) 
