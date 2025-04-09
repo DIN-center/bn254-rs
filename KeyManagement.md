@@ -2,11 +2,12 @@
 
 ## Overview
 
-The Key Management Service is a secure component designed for EigenLabs AVS operators, providing:
-- Secure key generation and storage
-- Signing operations within a secure enclave
-- EOA-based authentication
-- Seamless key rotation capabilities
+The Key Management Service is a proof-of-concept component designed for EigenLabs AVS operators, establishing a foundation for security through separation of concerns:
+- Key storage and management isolated from other system components
+- Signing operations performed in a dedicated service
+- Architecture that enables future security enhancements
+
+Note: This implementation does NOT provide production-level security guarantees. It demonstrates the necessary separation of concerns that would be required in a properly secured key management system.
 
 ## Architecture
 
@@ -65,10 +66,6 @@ flowchart TB
 
 ```typescript
 interface KeyManagementService {
-    // Create a new BLS key for an operator and store it securely
-    // Note: The generated key pair is stored in the secure enclave and never exposed to the user
-    createKey(eoa: string): Promise<void>;
-    
     // Perform scalar multiplication for signing
     // Note: Only public data (hash) is provided, private key operations happen in secure enclave
     scalar_mul(
@@ -83,11 +80,10 @@ interface KeyManagementService {
 ```
 
 ### Security Model
-- Generated key pairs stored in secure enclave
-- Private keys never exposed outside secure environment
-- Only public data (hashes) accepted for signing
-- All cryptographic operations in secure enclave
-- Key rotation handled within secure environment
+- Private keys never exposed outside web-server (separation of concerns, not production security)
+- Only public data (hashes) accepted for signing (foundation for secure design)
+- All cryptographic operations in web-server (architectural pattern for future security hardening)
+- Note: This design establishes separation of concerns that would allow for a secure KMS to be built on top, but does not provide production-level security guarantees
 
 ## Current Implementation
 
@@ -97,11 +93,12 @@ interface KeyManagementService {
 3. Enable TXTX signing through local web service
 4. Maintain EOA verification in runbook workflow
 
-### Security Features
-- Private keys never leave secure enclave
-- All signing operations in secure environment
-- Operator authentication via EOA verification
-- Upgradeable to more secure curves
+### Addressing a technical debt through better architecture
+- The separation of concerns pattern enables a smoother upgrade path when EigenLayer transitions from BN254 to a more secure curve
+- Key management logic remains isolated from curve-specific implementations
+- Operators can maintain the same workflow while underlying cryptography evolves
+- Minimizes disruption during security upgrades
+- Allows for parallel support of multiple curves during transition periods
 
 ## Future Enhancements
 

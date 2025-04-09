@@ -2,15 +2,13 @@
 
 ## Overview
 
-This document outlines the security roadmap and future enhancements for the Key Management Service, including:
-- Security audit findings
-- Implementation roadmap
-- Scalability considerations
-- Technical terminology
+This document outlines the potential security roadmap and future enhancements for the Key Management Service. The current implementation is a proof-of-concept demonstrating separation of concerns, not a production-ready secure system. These considerations represent the security features that would need to be implemented to make this a production-ready system.
 
 ## Security Audit
 
-### Critical Recommendations
+### Critical Recommendations for Production
+
+The following recommendations would be necessary to transform this proof-of-concept into a production-ready secure system:
 
 #### Access Control
 - Implement strong mutual TLS (mTLS)
@@ -51,6 +49,8 @@ This document outlines the security roadmap and future enhancements for the Key 
 - Implement secure key destruction
 
 ## Enhanced Architecture
+
+The following diagram illustrates the architecture that would be required for a production-ready secure system. The current implementation only demonstrates the basic separation of concerns shown in the simpler diagram in [KeyManagement.md](KeyManagement.md).
 
 ```mermaid
 flowchart TB
@@ -111,6 +111,8 @@ flowchart TB
 
 ## Risk Assessment
 
+The following risks would need to be addressed in a production implementation:
+
 | Risk Category | Threat | Impact | Mitigation |
 |--------------|--------|---------|------------|
 | Key Exposure | Unauthorized access | Critical | HSM, secure enclave |
@@ -120,6 +122,8 @@ flowchart TB
 | Compliance | Regulatory violations | High | Standards alignment |
 
 ## Implementation Roadmap
+
+This roadmap outlines the steps needed to transform the current proof-of-concept into a production-ready secure system:
 
 ### Phase 1: Critical Security
 - HSM integration
@@ -140,6 +144,8 @@ flowchart TB
 - Security guidelines
 
 ## Scalability
+
+The following scalability considerations would be important for a production implementation:
 
 ### Multi-Region Support
 - Geographical distribution

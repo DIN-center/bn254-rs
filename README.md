@@ -1,22 +1,22 @@
 # bn254-rs
 
-A Rust implementation of BN254 curve operations and secure key management service for EigenLayer AVS operators.
+A Rust implementation of BN254 curve operations with a separate key management service for EigenLayer AVS operators.
 
 ## Overview
 
 This project provides:
 1. A Rust library for BN254 curve operations compatible with EigenLayer's [BN254.sol](https://github.com/Layr-Labs/eigenlayer-middleware/blob/dev/src/libraries/BN254.sol)
-2. A secure key management service for AVS operators
+2. A proof-of-concept key management service demonstrating separation of concerns for AVS operators
 
 ## Project Status
 
-⚠️ **Current Status**: **Experimental/In Development**
+⚠️ **Current Status**: **Experimental/Proof of Concept**
 
 - ✅ Basic BN254 operations implemented and tested
 - ✅ Property-based tests passing for scalar multiplication
 - ✅ Solidity and Rust agree on scalar multiplication outputs
 - ✅ **BLS handshake verified**: msg_hash * priv_key = sig_out
-- ✅ **Key Management Service**: Secure key generation and signing operations
+- ✅ **Key Management Service**: Proof of concept demonstrating separation of concerns
 
 ## Documentation Structure
 
@@ -41,7 +41,7 @@ bn254-rs = "0.1.0"  # Replace with actual version
 ### Key Management Service
 ```bash
 # Run the service
-cargo run --bin bn254-key-service
+cargo run --bin bn254-rs
 
 # Run tests
 cargo test
@@ -60,10 +60,9 @@ cargo test
 ## Key Management Service
 
 ### Features
-- Secure key generation and storage
-- Signing operations within secure enclave
-- EOA-based authentication
-- Future support for key rotation
+- Separation of concerns for security foundation
+- Signing operations with keys from storage
+- No key generation, only read from existing key store
 
 See [Key Management Design](KeyManagement.md) for detailed architecture.
 
@@ -73,7 +72,7 @@ See [Key Management Design](KeyManagement.md) for detailed architecture.
 ```
 bn254-rs/
 ├── src/
-│   ├── lib.rs           # BN254 library implementation
+│   ├── lib.rs          # BN254 library implementation
 │   ├── web/            # Key Management Service
 │   │   ├── README.md   # API documentation
 │   │   ├── handlers.rs # API endpoints
