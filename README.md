@@ -288,7 +288,7 @@ This library is designed to be a direct Rust counterpart to EigenLayer's BN254.s
       # call_pubkey_registration_message_hash_result: a G1 point (uint256,uint256)
       # 2c1619993b1ae6dcb33661d64742b2b7336a90c3db7dfaba6eb691d98fea060a 0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06",
       # G1.X: 0x2c1619993b1ae6dcb33661d64742b2b7336a90c3db7dfaba6eb691d98fea060a 
-      # G!.Y: 0x0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06
+      # G1.Y: 0x0a16f975b962fecbe821b85c2d96093a9db1f2cf12b878a2376d99a16c4d9f06
 
       cast call 0x5FbDB2315678afecb367f032d93F642f64180aa3 \
         "scalar_mul((uint256,uint256),uint256)((uint256,uint256))" \
