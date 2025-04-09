@@ -1,121 +1,156 @@
-# BN254 Key Management Service
+# BN254 Key Management Service API
 
-A secure web service for managing BN254 keys for AVS operators. This service provides secure key generation, storage, and signing operations within a secure enclave.
+## Overview
 
-## Security Features
+This document describes the API for the BN254 Key Management Service, a proof-of-concept implementation demonstrating separation of concerns for key management operations. This service is designed to show how key management can be isolated from other system components, establishing a foundation for future security enhancements.
 
-- Keys are generated and stored in a secure enclave
-- Private keys never leave the secure environment
-- All cryptographic operations performed within the enclave
-- EOA-based authentication for operators
-- Support for key rotation (planned)
+> **Important Note**: This is a proof-of-concept implementation that demonstrates architectural patterns for separation of concerns. It does NOT provide production-level security guarantees. The current implementation is for demonstration purposes only.
 
 ## API Endpoints
 
 ### Key Management
 
-- `GET /api/keys/{eoa_address}` - Get public key information for an operator
-  - Returns only public components (G1, G2 points)
-  - Private key remains in secure storage
-
-- `GET /api/keys` - List all registered operator public keys
-  - Returns only public components for all operators
-
-### Signing Operations
-
-- `POST /api/sign` - Sign a message using the operator's stored key
-  - Requires EOA authentication
-  - Returns signature and public components only
-
-- `POST /api/scalar_mul` - Perform scalar multiplication (for BLS signatures)
-  - Requires EOA authentication
-  - Returns result and public components
-
-## Example Usage
-
-### Get Public Key Information
-
-```bash
-curl http://localhost:8080/api/keys/0x1234567890123456789012345678901234567890
+#### Get Public Key for EOA
+```
+GET /api/keys/{eoa_address}
 ```
 
-Response:
+Returns the public key components for a given EOA address.
+
+**Parameters:**
+- `eoa_address` (path): The Ethereum address of the operator
+
+**Response:**
 ```json
 {
-  "eoa_address": "0x1234567890123456789012345678901234567890",
-  "public_key_g1": {
-    "x": "...",
-    "y": "..."
+  "g1": {
+    "x": "0x1234...",
+    "y": "0x5678..."
   },
-  "public_key_g2": {
-    "x_a": "...",
-    "x_b": "...",
-    "y_a": "...",
-    "y_b": "..."
+  "g2": {
+    "x": ["0xabcd...", "0xefgh..."],
+    "y": ["0xijkl...", "0xmnop..."]
   }
 }
 ```
 
-### Sign Data
-
-```bash
-curl -X POST http://localhost:8080/api/sign \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <eoa_signature>" \
-  -d '{
-    "eoa_address": "0x1234567890123456789012345678901234567890",
-    "point": "..."
-  }'
+#### List All Public Keys
+```
+GET /api/keys
 ```
 
-Response:
+Returns public key components for all registered EOAs.
+
+**Response:**
 ```json
 {
-  "product": {
-    "x": "...",
-    "y": "..."
-  },
-  "signer_g1": {
-    "x": "...",
-    "y": "..."
+  "keys": [
+    {
+      "eoa": "0x1234...",
+      "g1": {
+        "x": "0x1234...",
+        "y": "0x5678..."
+      },
+      "g2": {
+        "x": ["0xabcd...", "0xefgh..."],
+        "y": ["0xijkl...", "0xmnop..."]
+      }
+    }
+  ]
+}
+```
+
+### Signing Operations
+
+#### Sign Data
+```
+POST /api/sign
+```
+
+Signs data using the private key associated with the provided EOA.
+
+**Request Body:**
+```json
+{
+  "eoa": "0x1234...",
+  "hash": {
+    "x": "0x1234...",
+    "y": "0x5678..."
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "signature": {
+    "x": "0x1234...",
+    "y": "0x5678..."
+  }
+}
+```
+
+#### Scalar Multiplication
+```
+POST /api/scalar_mul
+```
+
+Performs scalar multiplication on a G1 point using the private key associated with the provided EOA.
+
+**Request Body:**
+```json
+{
+  "eoa": "0x1234...",
+  "point": {
+    "x": "0x1234...",
+    "y": "0x5678..."
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "x": "0x1234...",
+    "y": "0x5678..."
   }
 }
 ```
 
 ## Architecture
 
-The service follows a secure architecture where:
-1. Operators authenticate using their EOA
-2. All key operations happen within a secure enclave
-3. Only public data and signatures are returned
-4. Private keys are never exposed
+The service is designed with separation of concerns in mind:
 
-For detailed architecture and security considerations, see:
-- [Key Management Design](../../KeyManagement.md)
-- [Future Security Enhancements](../../FutureConsiderations.md)
+1. **Key Storage**: Keys are stored separately from the application logic
+2. **Signing Operations**: Cryptographic operations are isolated in a dedicated service
+3. **API Interface**: Clean API boundaries for future security enhancements
+
+This architecture demonstrates the pattern needed for a secure key management system, though the current implementation does not provide production-level security guarantees.
 
 ## Development Setup
 
-1. Install dependencies:
+### Building
 ```bash
 cargo build
 ```
 
-2. Run the service:
+### Running
 ```bash
 cargo run --bin bn254-key-service
 ```
 
-3. Run tests:
+### Testing
 ```bash
 cargo test
 ```
 
 ## Security Notes
 
-- This service is designed to be run in a secure environment
-- Private keys are never exposed via the API. Current APIS that 
-  expose keys are for debugging purposes and should be removed 
-  in the future.
-- All requests must be authenticated using EOA signatures
-- Monitor logs for any unauthorized access attempts 
+This proof-of-concept implementation:
+- Demonstrates separation of concerns for key management
+- Shows how cryptographic operations can be isolated
+- Establishes patterns for future security enhancements
+- Does NOT provide production-level security guarantees
+
+For a production implementation, additional security measures would be required as outlined in [FutureConsiderations.md](../../FutureConsiderations.md).
