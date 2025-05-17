@@ -15,8 +15,18 @@ pub async fn start_server() -> std::io::Result<()> {
         }
     };
     let store = web::Data::new(store);
+    
+    // Initialize Anvil contract
+    handlers::init_contract();
 
-    info!("Starting server at http://127.0.0.1:8080");
+    info!("🚀 Starting BN254 Web Service");
+    info!("📡 Server running at: http://127.0.0.1:8080");
+    info!("Available endpoints:");
+    info!("  GET  /api/keys/{{eoa_address}} - Get key pair by EOA address");
+    info!("  GET  /api/keys              - List all key pairs");
+    info!("  POST /api/scalar_mul        - Perform scalar multiplication");
+    info!("  POST /api/sign              - Sign a message");
+    info!("  POST /api/registration_params - Get registration parameters");
     
     HttpServer::new(move || {
         App::new()
@@ -27,6 +37,7 @@ pub async fn start_server() -> std::io::Result<()> {
                     .route("/keys", web::get().to(handlers::list_key_pairs))
                     .route("/scalar_mul", web::post().to(handlers::scalar_mul))
                     .route("/sign", web::post().to(handlers::sign))
+                    .route("/registration_params", web::post().to(handlers::get_registration_params_anvil))
             )
     })
     .bind("127.0.0.1:8080")?

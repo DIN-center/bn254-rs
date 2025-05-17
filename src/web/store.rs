@@ -31,10 +31,10 @@ impl Store {
                             y: player_obj["bls"]["g1_y"].as_str().unwrap_or_default().to_string(),
                         },
                         public_key_g2: G2Point {
-                            x_a: player_obj["bls"]["g2_x_0"].as_str().unwrap_or_default().to_string(),
-                            x_b: player_obj["bls"]["g2_x_1"].as_str().unwrap_or_default().to_string(),
-                            y_a: player_obj["bls"]["g2_y_0"].as_str().unwrap_or_default().to_string(),
-                            y_b: player_obj["bls"]["g2_y_1"].as_str().unwrap_or_default().to_string(),
+                            x_0: player_obj["bls"]["g2_x_0"].as_str().unwrap_or_default().to_string(),
+                            x_1: player_obj["bls"]["g2_x_1"].as_str().unwrap_or_default().to_string(),
+                            y_0: player_obj["bls"]["g2_y_0"].as_str().unwrap_or_default().to_string(),
+                            y_1: player_obj["bls"]["g2_y_1"].as_str().unwrap_or_default().to_string(),
                         },
                     };
                     

@@ -35,6 +35,22 @@ pub struct SignRequest {
     pub point: String,
 }
 
+/// Request for getting registration parameters
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegistrationParamsRequest {
+    pub eoa_address: String,
+    pub message_hash: String,
+}
+
+/// Response containing all registration parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistrationParamsResponse {
+    pub signature: G1Point,
+    pub g1: G1Point,
+    pub g2: G2Point,
+    pub formatted_signature: String,
+}
+
 /// G1 point coordinates
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct G1Point {
@@ -45,10 +61,10 @@ pub struct G1Point {
 /// G2 point coordinates
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct G2Point {
-    pub x_a: String,
-    pub x_b: String,
-    pub y_a: String,
-    pub y_b: String,
+    pub x_0: String,
+    pub x_1: String,
+    pub y_0: String,
+    pub y_1: String,
 }
 
 /// Response for signing a G1 point
@@ -68,10 +84,10 @@ impl G1Point {
 
 impl G2Point {
     pub fn to_g2_point(&self) -> Result<ark_bn254::G2Projective, String> {
-        let x_a = Fq::from_str(&self.x_a).map_err(|_| "Failed to parse x_a coordinate".to_string())?;
-        let x_b = Fq::from_str(&self.x_b).map_err(|_| "Failed to parse x_b coordinate".to_string())?;
-        let y_a = Fq::from_str(&self.y_a).map_err(|_| "Failed to parse y_a coordinate".to_string())?;
-        let y_b = Fq::from_str(&self.y_b).map_err(|_| "Failed to parse y_b coordinate".to_string())?;
+        let x_a = Fq::from_str(&self.x_0).map_err(|_| "Failed to parse x_0 coordinate".to_string())?;
+        let x_b = Fq::from_str(&self.x_1).map_err(|_| "Failed to parse x_1 coordinate".to_string())?;
+        let y_a = Fq::from_str(&self.y_0).map_err(|_| "Failed to parse y_0 coordinate".to_string())?;
+        let y_b = Fq::from_str(&self.y_1).map_err(|_| "Failed to parse y_1 coordinate".to_string())?;
         Ok(ark_bn254::G2Projective::new_unchecked(
             ark_bn254::Fq2::new(x_a, x_b),
             ark_bn254::Fq2::new(y_a, y_b),
