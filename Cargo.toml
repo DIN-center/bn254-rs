@@ -44,3 +44,8 @@ num-bigint = "0.4"
 num-traits = "0.2"
 proptest = "1.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+
+[[bin]]
+name = "bn-testnet2"
+path = "src/main.rs"
