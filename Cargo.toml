@@ -47,5 +47,5 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 
 [[bin]]
-name = "bn-testnet2"
+name = "txtx-bn254-signer"
 path = "src/main.rs"
