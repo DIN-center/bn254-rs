@@ -35,17 +35,20 @@
 //! # Run with default settings
 //! cargo run --bin bn254-rs
 //! 
-//! # Run with custom database file
-//! cargo run --bin bn254-rs -- --db /path/to/keys.json
+//! # Run with custom EOA mapping file
+//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json
 //! 
 //! # Run on a different port
 //! cargo run --bin bn254-rs -- --port 8080
+//! 
+//! # Run on all interfaces (for Docker)
+//! cargo run --bin bn254-rs -- --host 0.0.0.0
 //! 
 //! # Run with debug logging
 //! cargo run --bin bn254-rs -- --log-level debug
 //! 
 //! # Run with all custom options
-//! cargo run --bin bn254-rs -- --db /path/to/keys.json --port 8080 --log-level debug
+//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json --host 0.0.0.0 --port 8080 --log-level debug
 //! 
 //! # Run with environment variable
 //! RUST_LOG=trace cargo run --bin bn254-rs
@@ -78,19 +81,32 @@ struct Args {
     #[arg(short, long, default_value = "info")]
     log_level: String,
     
-    /// Path to the JSON database file containing operator keys
+    /// Path to the EOA-to-key mapping JSON file
     /// 
-    /// This file should contain the BLS key pairs for operators.
-    /// If not specified, defaults to "players.json" in the current directory.
-    #[arg(short, long, default_value = "players.json")]
+    /// This file should map EOA addresses to key IDs (key_0 through key_49).
+    /// Example format:
+    /// {
+    ///   "0x70997970C51812dc3A010C7d01b50e0d17dc79C8": "key_0",
+    ///   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": "key_1"
+    /// }
+    /// 
+    /// If not specified, defaults to "data/eoa-keymap.json"
+    #[arg(short, long, default_value = "data/eoa-keymap.json")]
     db: String,
     
     /// Port to run the web server on
     /// 
-    /// The service will bind to this port on localhost (127.0.0.1).
+    /// The service will bind to this port on the specified address.
     /// If not specified, defaults to port 3000.
     #[arg(short, long, default_value_t = 3000)]
     port: u16,
+    
+    /// Host address to bind the server to
+    /// 
+    /// Use 0.0.0.0 to listen on all interfaces, or 127.0.0.1 for localhost only.
+    /// If not specified, defaults to 0.0.0.0 for Docker compatibility.
+    #[arg(short = 'H', long, default_value = "0.0.0.0")]
+    host: String,
 }
 
 #[tokio::main]
@@ -111,14 +127,14 @@ async fn main() {
 
     tracing::info!("Starting BN254 Key Management Service with log level: {}", args.log_level);
     tracing::info!("Using database file: {}", args.db);
-    tracing::info!("Server will listen on port: {}", args.port);
+    tracing::info!("Server will listen on {}:{}", args.host, args.port);
     
     // Start the web server
     // This will:
     // 1. Load the key store from the specified database file
-    // 2. Start the HTTP server on the specified port
+    // 2. Start the HTTP server on the specified address and port
     // 3. Set up all API routes
-    if let Err(e) = web::start_server(&args.db, args.port).await {
+    if let Err(e) = web::start_server(&args.db, &args.host, args.port).await {
         tracing::error!("Error running web service: {}", e);
         std::process::exit(1);
     }

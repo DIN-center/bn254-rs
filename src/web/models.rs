@@ -104,10 +104,13 @@ impl fmt::Display for ScalarMulResponse {
 /// ## Format
 /// - `eoa_address`: Operator's Ethereum address
 /// - `message`: 128-character hex string containing concatenated x,y coordinates (64 chars each)
+/// - `key_index`: Optional key index (e.g., "key_8") for direct key specification
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SignRequest {
     pub eoa_address: String,
     pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_index: Option<String>,
 }
 
 /// Request for getting registration parameters
@@ -115,6 +118,8 @@ pub struct SignRequest {
 pub struct RegistrationParamsRequest {
     pub eoa_address: String,
     pub message_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_index: Option<String>,
 }
 
 /// Solidity compatible BN254 G1Point structure

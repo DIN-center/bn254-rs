@@ -49,23 +49,24 @@ pub mod server;
 use tracing::{info, error};
 use std::io;
 
-/// Start the web service with a custom database path and port
+/// Start the web service with a custom database path, bind address, and port
 /// 
 /// This function:
 /// 1. Initializes the key store from the specified database file
-/// 2. Starts the HTTP server on the specified port
+/// 2. Starts the HTTP server on the specified address and port
 /// 3. Sets up all API routes with tracing middleware
 /// 
 /// # Arguments
 /// 
-/// * `db_path` - Path to the JSON database file containing operator keys
+/// * `db_path` - Path to the EOA-to-key mapping JSON file
+/// * `bind_addr` - IP address to bind the server to (e.g., "0.0.0.0" or "127.0.0.1")
 /// * `port` - Port number to bind the server to
 /// 
 /// # Errors
 /// 
 /// Returns an error if:
 /// - The key store file cannot be read or parsed
-/// - The server cannot bind to the specified port
+/// - The server cannot bind to the specified address and port
 /// - Any other I/O error occurs
 /// 
 /// # Maintenance Notes
@@ -78,21 +79,22 @@ use std::io;
 /// Port Configuration:
 /// - Port is now configurable via CLI argument
 /// - Default port is 3000 for backward compatibility
-pub async fn start_server(db_path: &str, port: u16) -> io::Result<()> {
-    // Initialize store from JSON file
-    // The store loads all operator keys into memory at startup
-    let store = match store::Store::from_file(db_path) {
+/// - Bind address defaults to 0.0.0.0 for Docker compatibility
+pub async fn start_server(db_path: &str, bind_addr: &str, port: u16) -> io::Result<()> {
+    // Initialize store from EOA mapping file
+    // The store loads the mapping and combines with embedded BLS key pool
+    let store = match store::Store::from_mapping(db_path) {
         Ok(store) => store,
         Err(e) => {
-            error!("Failed to initialize store from {}: {}", db_path, e);
+            error!("Failed to initialize store from mapping {}: {}", db_path, e);
             return Err(io::Error::new(io::ErrorKind::Other, e));
         }
     };
 
     info!("Loaded key store from: {}", db_path);
-    info!("Starting server at http://127.0.0.1:{}", port);
+    info!("Starting server at http://{}:{}", bind_addr, port);
     
-    // Run the server with the initialized store and port
+    // Run the server with the initialized store, bind address, and port
     // This will set up all routes and start listening for connections
-    server::run_server(store, port).await
+    server::run_server(store, bind_addr, port).await
 }

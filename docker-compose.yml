@@ -1,0 +1,66 @@
+services:
+  txtx-bn254-signer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - rust:1.83-alpine
+        - alpine:3.19
+    image: txtx-bn254-signer:latest
+    container_name: txtx-bn254-signer
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Override log level via environment variable
+      # RUST_LOG: debug
+      # Or use CLI args in command below
+    volumes:
+      # Mount local data directory for persistence
+      - ./data:/app/data:ro
+      # Optionally mount custom keys file
+      # - ./custom-keys.json:/app/data/players.json:ro
+    command: 
+      - "--db"
+      - "/app/data/players.json"
+      - "--port"
+      - "3000"
+      - "--log-level"
+      - "info"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/keys"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - bn254-network
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/run
+
+networks:
+  bn254-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+
+# Optional: Add volumes for persistent data
+volumes:
+  bn254-data:
+    driver: local
