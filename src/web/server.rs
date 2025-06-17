@@ -52,13 +52,13 @@ async fn log_response_middleware(
     Ok(response)
 }
 
-/// Start the web server on the specified port
-pub async fn run_server(store: Store, port: u16) -> std::io::Result<()> {
+/// Start the web server on the specified host and port
+pub async fn run_server(store: Store, host: &str, port: u16) -> std::io::Result<()> {
     // Logging is already initialized in main
     
     let shared_state = Arc::new(store);
     
-    let bind_addr = format!("127.0.0.1:{}", port);
+    let bind_addr = format!("{}:{}", host, port);
     info!("Starting server at http://{}", bind_addr);
     
     debug!("Configuring application routes");

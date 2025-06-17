@@ -41,11 +41,14 @@
 //! # Run on a different port
 //! cargo run --bin bn254-rs -- --port 8080
 //! 
+//! # Run on all interfaces (for Docker)
+//! cargo run --bin bn254-rs -- --host 0.0.0.0
+//! 
 //! # Run with debug logging
 //! cargo run --bin bn254-rs -- --log-level debug
 //! 
 //! # Run with all custom options
-//! cargo run --bin bn254-rs -- --db /path/to/keys.json --port 8080 --log-level debug
+//! cargo run --bin bn254-rs -- --db /path/to/keys.json --host 0.0.0.0 --port 8080 --log-level debug
 //! 
 //! # Run with environment variable
 //! RUST_LOG=trace cargo run --bin bn254-rs
@@ -87,10 +90,17 @@ struct Args {
     
     /// Port to run the web server on
     /// 
-    /// The service will bind to this port on localhost (127.0.0.1).
+    /// The service will bind to this port on the specified address.
     /// If not specified, defaults to port 3000.
     #[arg(short, long, default_value_t = 3000)]
     port: u16,
+    
+    /// Host address to bind the server to
+    /// 
+    /// Use 0.0.0.0 to listen on all interfaces, or 127.0.0.1 for localhost only.
+    /// If not specified, defaults to 0.0.0.0 for Docker compatibility.
+    #[arg(short = 'H', long, default_value = "0.0.0.0")]
+    host: String,
 }
 
 #[tokio::main]
@@ -111,14 +121,14 @@ async fn main() {
 
     tracing::info!("Starting BN254 Key Management Service with log level: {}", args.log_level);
     tracing::info!("Using database file: {}", args.db);
-    tracing::info!("Server will listen on port: {}", args.port);
+    tracing::info!("Server will listen on {}:{}", args.host, args.port);
     
     // Start the web server
     // This will:
     // 1. Load the key store from the specified database file
-    // 2. Start the HTTP server on the specified port
+    // 2. Start the HTTP server on the specified address and port
     // 3. Set up all API routes
-    if let Err(e) = web::start_server(&args.db, args.port).await {
+    if let Err(e) = web::start_server(&args.db, &args.host, args.port).await {
         tracing::error!("Error running web service: {}", e);
         std::process::exit(1);
     }
