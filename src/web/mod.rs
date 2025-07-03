@@ -58,7 +58,7 @@ use std::io;
 /// 
 /// # Arguments
 /// 
-/// * `db_path` - Path to the JSON database file containing operator keys
+/// * `db_path` - Path to the EOA-to-key mapping JSON file
 /// * `bind_addr` - IP address to bind the server to (e.g., "0.0.0.0" or "127.0.0.1")
 /// * `port` - Port number to bind the server to
 /// 
@@ -81,12 +81,12 @@ use std::io;
 /// - Default port is 3000 for backward compatibility
 /// - Bind address defaults to 0.0.0.0 for Docker compatibility
 pub async fn start_server(db_path: &str, bind_addr: &str, port: u16) -> io::Result<()> {
-    // Initialize store from JSON file
-    // The store loads all operator keys into memory at startup
-    let store = match store::Store::from_file(db_path) {
+    // Initialize store from EOA mapping file
+    // The store loads the mapping and combines with embedded BLS key pool
+    let store = match store::Store::from_mapping(db_path) {
         Ok(store) => store,
         Err(e) => {
-            error!("Failed to initialize store from {}: {}", db_path, e);
+            error!("Failed to initialize store from mapping {}: {}", db_path, e);
             return Err(io::Error::new(io::ErrorKind::Other, e));
         }
     };

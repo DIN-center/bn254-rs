@@ -35,8 +35,8 @@
 //! # Run with default settings
 //! cargo run --bin bn254-rs
 //! 
-//! # Run with custom database file
-//! cargo run --bin bn254-rs -- --db /path/to/keys.json
+//! # Run with custom EOA mapping file
+//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json
 //! 
 //! # Run on a different port
 //! cargo run --bin bn254-rs -- --port 8080
@@ -48,7 +48,7 @@
 //! cargo run --bin bn254-rs -- --log-level debug
 //! 
 //! # Run with all custom options
-//! cargo run --bin bn254-rs -- --db /path/to/keys.json --host 0.0.0.0 --port 8080 --log-level debug
+//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json --host 0.0.0.0 --port 8080 --log-level debug
 //! 
 //! # Run with environment variable
 //! RUST_LOG=trace cargo run --bin bn254-rs
@@ -81,11 +81,17 @@ struct Args {
     #[arg(short, long, default_value = "info")]
     log_level: String,
     
-    /// Path to the JSON database file containing operator keys
+    /// Path to the EOA-to-key mapping JSON file
     /// 
-    /// This file should contain the BLS key pairs for operators.
-    /// If not specified, defaults to "players.json" in the current directory.
-    #[arg(short, long, default_value = "players.json")]
+    /// This file should map EOA addresses to key IDs (key_0 through key_49).
+    /// Example format:
+    /// {
+    ///   "0x70997970C51812dc3A010C7d01b50e0d17dc79C8": "key_0",
+    ///   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": "key_1"
+    /// }
+    /// 
+    /// If not specified, defaults to "data/eoa-keymap.json"
+    #[arg(short, long, default_value = "data/eoa-keymap.json")]
     db: String,
     
     /// Port to run the web server on
