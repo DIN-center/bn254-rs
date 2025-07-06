@@ -52,6 +52,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use serde_json;
 use hex;
 use tracing::{debug, error, info, trace};
 use std::str::FromStr;
@@ -240,6 +241,28 @@ fn create_formatted_params(
             }
         ]
     })
+}
+
+/// Health check endpoint
+/// 
+/// Returns service status and key store information
+pub async fn health_check(State(store): State<Arc<Store>>) -> impl IntoResponse {
+    debug!("Health check requested");
+    
+    let key_count = store.key_map.len();
+    let status = if key_count > 0 { "healthy" } else { "degraded" };
+    
+    Json(serde_json::json!({
+        "status": status,
+        "service": "bn254-signer",
+        "version": env!("CARGO_PKG_VERSION"),
+        "keys_loaded": key_count,
+        "message": if key_count > 0 {
+            format!("Service healthy with {} keys loaded", key_count)
+        } else {
+            "Service running but no keys loaded".to_string()
+        }
+    }))
 }
 
 /// Get a key pair by EOA address

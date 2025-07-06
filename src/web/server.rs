@@ -9,7 +9,7 @@ use axum::{
 use std::sync::Arc;
 use tower_http::trace::{TraceLayer, DefaultOnResponse, DefaultMakeSpan};
 use tracing::{info, debug, Level};
-use crate::web::handlers::{get_key_pair, list_key_pairs, scalar_mul, sign, get_registration_params};
+use crate::web::handlers::{health_check, get_key_pair, list_key_pairs, scalar_mul, sign, get_registration_params};
 use crate::web::store::Store;
 
 // Log response middleware with request details
@@ -65,6 +65,7 @@ pub async fn run_server(store: Store, host: &str, port: u16) -> std::io::Result<
     
     // Build our application with routes
     let app = Router::new()
+        .route("/health", get(health_check))
         .route("/key/:eoa_address", get(get_key_pair))
         .route("/keys", get(list_key_pairs))
         .route("/scalar_mul", post(scalar_mul))
