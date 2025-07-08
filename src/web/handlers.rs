@@ -249,7 +249,7 @@ fn create_formatted_params(
 pub async fn health_check(State(store): State<Arc<Store>>) -> impl IntoResponse {
     debug!("Health check requested");
     
-    let key_count = store.key_map.len();
+    let key_count = store.list_key_pairs().len();
     let status = if key_count > 0 { "healthy" } else { "degraded" };
     
     Json(serde_json::json!({

@@ -1,0 +1,41 @@
+# Fast build Dockerfile - expects pre-built binary
+FROM ubuntu:22.04
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1000 app \
+    && useradd -u 1000 -g app -m app
+
+# Create data directory
+RUN mkdir -p /app/data && chown -R app:app /app
+
+WORKDIR /app
+
+# Copy pre-built binary from host
+# Note: Binary must be built with: cargo build --release --bin txtx-bn254-signer
+COPY txtx-bn254-signer /usr/local/bin/txtx-bn254-signer
+RUN chmod +x /usr/local/bin/txtx-bn254-signer
+
+# Copy default data files if they exist
+COPY --chown=app:app data/players.json /app/data/players.json
+
+# Copy BLS key pool (required for the new Store implementation)
+RUN mkdir -p /app/src/web/bn254pool
+COPY src/web/bn254pool/keys.json /app/src/web/bn254pool/keys.json
+
+# Switch to non-root user
+USER app
+
+# Expose the default port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/keys || exit 1
+
+# Default command
+ENTRYPOINT ["txtx-bn254-signer"]
+CMD ["--db", "/app/data/players.json", "--port", "3000", "--log-level", "info"]

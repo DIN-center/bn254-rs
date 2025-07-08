@@ -23,7 +23,7 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 // Path to the embedded BLS key pool
 const BLS_KEY_POOL_PATH: &str = "src/web/bn254pool/keys.json";
