@@ -56,6 +56,8 @@ WORKDIR /app
 
 # Copy default data files if they exist
 COPY --chown=app:app data/players.json /app/data/players.json
+# Copy BLS key pool
+COPY --chown=app:app src/web/bn254pool/keys.json /app/data/keys.json
 
 # Switch to non-root user
 USER app

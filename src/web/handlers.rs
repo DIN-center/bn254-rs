@@ -443,19 +443,43 @@ pub async fn sign(
 ) -> impl IntoResponse {
     info!(
         eoa_address = %req.eoa_address,
+        key_index = ?req.key_index,
         message = %req.message,
         "Received sign request"
     );
 
-    // Get key pair from store
-    let key_pair = match store.get_key_pair(&req.eoa_address) {
-        Some(kp) => {
-            info!("Found key pair for EOA address: {}", req.eoa_address);
-            kp
+    // Get key pair from store - prefer key_index if provided
+    let key_pair = if let Some(ref key_idx) = req.key_index {
+        // Use the provided key_index
+        match store.get_key_pair(key_idx) {
+            Some(kp) => {
+                // Verify the EOA address matches if both are provided
+                if kp.eoa_address != req.eoa_address {
+                    error!(
+                        "EOA address mismatch: request={}, key={}",
+                        req.eoa_address, kp.eoa_address
+                    );
+                    return StatusCode::BAD_REQUEST.into_response();
+                }
+                info!("Found key pair using key_index: {}", key_idx);
+                kp
+            }
+            None => {
+                error!("Key pair not found for key_index: {}", key_idx);
+                return StatusCode::NOT_FOUND.into_response();
+            }
         }
-        None => {
-            error!("Key pair not found for address: {}", req.eoa_address);
-            return StatusCode::NOT_FOUND.into_response();
+    } else {
+        // Fall back to EOA address lookup
+        match store.get_key_pair(&req.eoa_address) {
+            Some(kp) => {
+                info!("Found key pair for EOA address: {}", req.eoa_address);
+                kp
+            }
+            None => {
+                error!("Key pair not found for address: {}", req.eoa_address);
+                return StatusCode::NOT_FOUND.into_response();
+            }
         }
     };
 
@@ -554,31 +578,65 @@ pub async fn get_registration_params(
     Json(req): Json<RegistrationParamsRequest>,
 ) -> Response {
     info!(
-        "Received registration params request for EOA: {}",
-        req.eoa_address
+        "Received registration params request for EOA: {}, key_index: {:?}",
+        req.eoa_address, req.key_index
     );
     debug!("Message hash: {}", req.message_hash);
 
-    // Get key pair from store
-    let key_pair = match store.get_key_pair(&req.eoa_address) {
-        Some(kp) => {
-            info!("Found key pair for EOA: {}", req.eoa_address);
-            debug!(
-                "G1 point: x={}, y={}",
-                kp.public_key_g1.x, kp.public_key_g1.y
-            );
-            debug!(
-                "G2 point: x_a={}, x_b={}, y_a={}, y_b={}",
-                kp.public_key_g2.x_a,
-                kp.public_key_g2.x_b,
-                kp.public_key_g2.y_a,
-                kp.public_key_g2.y_b
-            );
-            kp
+    // Get key pair from store - prefer key_index if provided
+    let key_pair = if let Some(ref key_idx) = req.key_index {
+        // Use the provided key_index
+        match store.get_key_pair(key_idx) {
+            Some(kp) => {
+                // Verify the EOA address matches if both are provided
+                if kp.eoa_address != req.eoa_address {
+                    error!(
+                        "EOA address mismatch: request={}, key={}",
+                        req.eoa_address, kp.eoa_address
+                    );
+                    return StatusCode::BAD_REQUEST.into_response();
+                }
+                info!("Found key pair using key_index: {}", key_idx);
+                debug!(
+                    "G1 point: x={}, y={}",
+                    kp.public_key_g1.x, kp.public_key_g1.y
+                );
+                debug!(
+                    "G2 point: x_a={}, x_b={}, y_a={}, y_b={}",
+                    kp.public_key_g2.x_a,
+                    kp.public_key_g2.x_b,
+                    kp.public_key_g2.y_a,
+                    kp.public_key_g2.y_b
+                );
+                kp
+            }
+            None => {
+                error!("Key pair not found for key_index: {}", key_idx);
+                return StatusCode::NOT_FOUND.into_response();
+            }
         }
-        None => {
-            error!("Key pair not found for address: {}", req.eoa_address);
-            return StatusCode::NOT_FOUND.into_response();
+    } else {
+        // Fall back to EOA address lookup
+        match store.get_key_pair(&req.eoa_address) {
+            Some(kp) => {
+                info!("Found key pair for EOA: {}", req.eoa_address);
+                debug!(
+                    "G1 point: x={}, y={}",
+                    kp.public_key_g1.x, kp.public_key_g1.y
+                );
+                debug!(
+                    "G2 point: x_a={}, x_b={}, y_a={}, y_b={}",
+                    kp.public_key_g2.x_a,
+                    kp.public_key_g2.x_b,
+                    kp.public_key_g2.y_a,
+                    kp.public_key_g2.y_b
+                );
+                kp
+            }
+            None => {
+                error!("Key pair not found for address: {}", req.eoa_address);
+                return StatusCode::NOT_FOUND.into_response();
+            }
         }
     };
 

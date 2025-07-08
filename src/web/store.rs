@@ -26,7 +26,7 @@ use std::fs;
 use tracing::{debug, info, trace, warn};
 
 // Path to the embedded BLS key pool
-const BLS_KEY_POOL_PATH: &str = "src/web/bn254pool/keys.json";
+const BLS_KEY_POOL_PATH: &str = "/app/data/keys.json";
 
 /// In-memory store for operator key pairs
 pub struct Store {
