@@ -53,8 +53,8 @@ impl Store {
         }
     }
     
-    /// Load all keys from the pool without EOA mapping (for testing)
-    fn load_all_from_pool() -> Result<Self> {
+    /// Load all keys from the pool without EOA mapping
+    pub fn load_all_from_pool() -> Result<Self> {
         let bls_pool = Self::load_bls_pool()?;
         let mut players = HashMap::new();
         let mut key_index = HashMap::new();
