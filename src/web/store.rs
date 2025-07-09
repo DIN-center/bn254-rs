@@ -24,6 +24,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use tracing::{debug, info, trace, warn};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 
 // Path to the embedded BLS key pool
 const BLS_KEY_POOL_PATH: &str = "/app/data/keys.json";
@@ -135,6 +136,68 @@ impl Store {
             "Key store initialized with {} mappings",
             players.len()
         );
+        
+        Ok(Self { players, key_index })
+    }
+    
+    /// Create a new store by deriving accounts from a mnemonic phrase
+    /// 
+    /// Derives the first 26 accounts from the mnemonic and maps them to key_0 through key_25
+    /// from the BLS key pool.
+    /// 
+    /// ## Arguments
+    /// * `mnemonic_phrase` - The mnemonic phrase to derive accounts from
+    pub fn from_mnemonic(mnemonic_phrase: &str) -> Result<Self> {
+        info!("Deriving 26 accounts from mnemonic");
+        
+        // Load the BLS key pool first
+        let bls_pool = Self::load_bls_pool()?;
+        
+        let mut players = HashMap::new();
+        let mut key_index = HashMap::new();
+        
+        // Derive the first 26 accounts (0-25)
+        for i in 0..26 {
+            // Build the wallet using the HD path m/44'/60'/0'/0/{i}
+            let wallet = MnemonicBuilder::<English>::default()
+                .phrase(mnemonic_phrase)
+                .index(i as u32)?
+                .build()?;
+            
+            // Get the EOA address
+            let eoa_address = format!("{:#x}", wallet.address());
+            let key_id = format!("key_{}", i);
+            
+            debug!("Derived account {}: {} -> {}", i, eoa_address, key_id);
+            
+            // Get the BLS key from the pool
+            if let Some(bls_data) = bls_pool.get(&key_id) {
+                let key_pair = KeyPair {
+                    eoa_address: eoa_address.clone(),
+                    private_key: bls_data.priv_key.clone(),
+                    public_key_g1: G1Point {
+                        x: bls_data.g1_x.clone(),
+                        y: bls_data.g1_y.clone(),
+                    },
+                    public_key_g2: G2Point {
+                        x_a: bls_data.g2_x_0.clone(),
+                        x_b: bls_data.g2_x_1.clone(),
+                        y_a: bls_data.g2_y_0.clone(),
+                        y_b: bls_data.g2_y_1.clone(),
+                    },
+                };
+                
+                // Add to both indices
+                players.insert(eoa_address.clone(), key_pair.clone());
+                key_index.insert(key_id.clone(), key_pair);
+                
+                trace!("Added key pair for account {} at {}", i, eoa_address);
+            } else {
+                warn!("BLS key {} not found in pool", key_id);
+            }
+        }
+        
+        info!("Derived {} accounts from mnemonic", players.len());
         
         Ok(Self { players, key_index })
     }
