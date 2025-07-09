@@ -107,6 +107,14 @@ struct Args {
     /// If not specified, defaults to 0.0.0.0 for Docker compatibility.
     #[arg(short = 'H', long, default_value = "0.0.0.0")]
     host: String,
+    
+    /// Mnemonic phrase for HD wallet derivation
+    /// 
+    /// If provided, derives the first 26 accounts from this mnemonic.
+    /// The derived EOA addresses will be mapped to key_0 through key_25.
+    /// This overrides the --db flag when provided.
+    #[arg(short, long)]
+    mnemonic: Option<String>,
 }
 
 #[tokio::main]
@@ -126,15 +134,19 @@ async fn main() {
         .init();
 
     tracing::info!("Starting BN254 Key Management Service with log level: {}", args.log_level);
-    tracing::info!("Using database file: {}", args.db);
+    if args.mnemonic.is_some() {
+        tracing::info!("Using mnemonic-based key derivation for 26 accounts");
+    } else {
+        tracing::info!("Using database file: {}", args.db);
+    }
     tracing::info!("Server will listen on {}:{}", args.host, args.port);
     
     // Start the web server
     // This will:
-    // 1. Load the key store from the specified database file
+    // 1. Load the key store from the specified database file or derive from mnemonic
     // 2. Start the HTTP server on the specified address and port
     // 3. Set up all API routes
-    if let Err(e) = web::start_server(&args.db, &args.host, args.port).await {
+    if let Err(e) = web::start_server(&args.db, &args.host, args.port, args.mnemonic).await {
         tracing::error!("Error running web service: {}", e);
         std::process::exit(1);
     }

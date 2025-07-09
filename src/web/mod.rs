@@ -49,10 +49,10 @@ pub mod server;
 use tracing::{info, error};
 use std::io;
 
-/// Start the web service with a custom database path, bind address, and port
+/// Start the web service with a custom database path, bind address, port, and optional mnemonic
 /// 
 /// This function:
-/// 1. Initializes the key store from the specified database file
+/// 1. Initializes the key store from the specified database file or mnemonic
 /// 2. Starts the HTTP server on the specified address and port
 /// 3. Sets up all API routes with tracing middleware
 /// 
@@ -61,11 +61,13 @@ use std::io;
 /// * `db_path` - Path to the EOA-to-key mapping JSON file (optional)
 /// * `bind_addr` - IP address to bind the server to (e.g., "0.0.0.0" or "127.0.0.1")
 /// * `port` - Port number to bind the server to
+/// * `mnemonic` - Optional mnemonic phrase for HD wallet derivation
 /// 
 /// # Errors
 /// 
 /// Returns an error if:
 /// - The key store file cannot be read or parsed
+/// - The mnemonic is invalid
 /// - The server cannot bind to the specified address and port
 /// - Any other I/O error occurs
 /// 
@@ -80,9 +82,18 @@ use std::io;
 /// - Port is now configurable via CLI argument
 /// - Default port is 3000 for backward compatibility
 /// - Bind address defaults to 0.0.0.0 for Docker compatibility
-pub async fn start_server(db_path: &str, bind_addr: &str, port: u16) -> io::Result<()> {
-    // Initialize store - if db_path is empty, load all keys from pool
-    let store = if db_path.is_empty() || db_path == "none" {
+pub async fn start_server(db_path: &str, bind_addr: &str, port: u16, mnemonic: Option<String>) -> io::Result<()> {
+    // Initialize store based on mnemonic or database path
+    let store = if let Some(mnemonic_phrase) = mnemonic {
+        info!("Deriving keys from mnemonic for 26 accounts");
+        match store::Store::from_mnemonic(&mnemonic_phrase) {
+            Ok(store) => store,
+            Err(e) => {
+                error!("Failed to derive keys from mnemonic: {}", e);
+                return Err(io::Error::new(io::ErrorKind::Other, e));
+            }
+        }
+    } else if db_path.is_empty() || db_path == "none" {
         info!("No mapping file specified, loading all keys from pool");
         match store::Store::load_all_from_pool() {
             Ok(store) => store,

@@ -1,7 +1,7 @@
 //! # Key Store Module V3
 //!
 //! This module manages BLS key pairs by combining:
-//! 1. A static BLS key pool (key_0 through key_49) 
+//! 1. A static BLS key pool (key_0 through key_49)
 //! 2. An EOA-to-key mapping file passed via --db flag
 //!
 //! ## Workflow
@@ -20,13 +20,14 @@
 
 use crate::web::models::{G1Point, G2Point, KeyPair};
 use anyhow::{Context, Result};
+use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
 use tracing::{debug, info, trace, warn};
 
 // Path to the embedded BLS key pool
-const BLS_KEY_POOL_PATH: &str = "/app/data/keys.json";
+const BLS_KEY_POOL_PATH: &str = "./data/keys.json";
 
 /// In-memory store for operator key pairs
 pub struct Store {
@@ -38,7 +39,7 @@ pub struct Store {
 
 impl Store {
     /// Create a new store by loading keys from default JSON file (backward compatibility)
-    /// 
+    ///
     /// This method is kept for backward compatibility but will attempt to use
     /// the new mapping format if the file contains EOA-to-key mappings.
     pub fn from_file(path: &str) -> Result<Self> {
@@ -52,13 +53,13 @@ impl Store {
             }
         }
     }
-    
+
     /// Load all keys from the pool without EOA mapping
     pub fn load_all_from_pool() -> Result<Self> {
         let bls_pool = Self::load_bls_pool()?;
         let mut players = HashMap::new();
         let mut key_index = HashMap::new();
-        
+
         // Create dummy EOA addresses for all keys
         for (key_id, bls_data) in bls_pool {
             let dummy_eoa = format!("0x{}", key_id);
@@ -76,11 +77,11 @@ impl Store {
                     y_b: bls_data.g2_y_1,
                 },
             };
-            
+
             players.insert(dummy_eoa, key_pair.clone());
             key_index.insert(key_id, key_pair);
         }
-        
+
         Ok(Self { players, key_index })
     }
     /// Create a new store by loading the EOA mapping and BLS key pool
@@ -89,21 +90,21 @@ impl Store {
     /// * `mapping_path` - Path to the EOA-to-key mapping JSON file
     pub fn from_mapping(mapping_path: &str) -> Result<Self> {
         info!("Initializing key store with mapping from: {}", mapping_path);
-        
+
         // Load the BLS key pool first
         let bls_pool = Self::load_bls_pool()?;
-        
+
         // Load the EOA-to-key mapping
         let eoa_mapping = Self::load_eoa_mapping(mapping_path)?;
-        
+
         // Construct the final store
         let mut players = HashMap::new();
         let mut key_index = HashMap::new();
-        
+
         // Process each EOA mapping
         for (eoa_address, key_id) in eoa_mapping {
             debug!("Processing mapping: {} -> {}", eoa_address, key_id);
-            
+
             // Get the BLS key from the pool
             if let Some(bls_data) = bls_pool.get(&key_id) {
                 let key_pair = KeyPair {
@@ -120,37 +121,99 @@ impl Store {
                         y_b: bls_data.g2_y_1.clone(),
                     },
                 };
-                
+
                 // Add to both indices
                 players.insert(eoa_address.clone(), key_pair.clone());
                 key_index.insert(key_id.clone(), key_pair);
-                
+
                 debug!("Added key pair for EOA {} using {}", eoa_address, key_id);
             } else {
-                warn!("BLS key {} not found in pool for EOA {}", key_id, eoa_address);
+                warn!(
+                    "BLS key {} not found in pool for EOA {}",
+                    key_id, eoa_address
+                );
             }
         }
-        
-        info!(
-            "Key store initialized with {} mappings",
-            players.len()
-        );
-        
+
+        info!("Key store initialized with {} mappings", players.len());
+
         Ok(Self { players, key_index })
     }
-    
+
+    /// Create a new store by deriving accounts from a mnemonic phrase
+    ///
+    /// Derives the first 26 accounts from the mnemonic and maps them to key_0 through key_25
+    /// from the BLS key pool.
+    ///
+    /// ## Arguments
+    /// * `mnemonic_phrase` - The mnemonic phrase to derive accounts from
+    pub fn from_mnemonic(mnemonic_phrase: &str) -> Result<Self> {
+        info!("Deriving 26 accounts from mnemonic");
+
+        // Load the BLS key pool first
+        let bls_pool = Self::load_bls_pool()?;
+
+        let mut players = HashMap::new();
+        let mut key_index = HashMap::new();
+
+        // Derive the first 26 accounts (0-25)
+        for i in 0..26 {
+            // Build the wallet using the HD path m/44'/60'/0'/0/{i}
+            let wallet = MnemonicBuilder::<English>::default()
+                .phrase(mnemonic_phrase)
+                .index(i as u32)?
+                .build()?;
+
+            // Get the EOA address
+            let eoa_address = format!("{:#x}", wallet.address());
+            let key_id = format!("key_{}", i);
+
+            debug!("Derived account {}: {} -> {}", i, eoa_address, key_id);
+
+            // Get the BLS key from the pool
+            if let Some(bls_data) = bls_pool.get(&key_id) {
+                let key_pair = KeyPair {
+                    eoa_address: eoa_address.clone(),
+                    private_key: bls_data.priv_key.clone(),
+                    public_key_g1: G1Point {
+                        x: bls_data.g1_x.clone(),
+                        y: bls_data.g1_y.clone(),
+                    },
+                    public_key_g2: G2Point {
+                        x_a: bls_data.g2_x_0.clone(),
+                        x_b: bls_data.g2_x_1.clone(),
+                        y_a: bls_data.g2_y_0.clone(),
+                        y_b: bls_data.g2_y_1.clone(),
+                    },
+                };
+
+                // Add to both indices
+                players.insert(eoa_address.clone(), key_pair.clone());
+                key_index.insert(key_id.clone(), key_pair);
+
+                trace!("Added key pair for account {} at {}", i, eoa_address);
+            } else {
+                warn!("BLS key {} not found in pool", key_id);
+            }
+        }
+
+        info!("Derived {} accounts from mnemonic", players.len());
+
+        Ok(Self { players, key_index })
+    }
+
     /// Load the BLS key pool from the embedded file
     fn load_bls_pool() -> Result<HashMap<String, BLSKeyData>> {
         debug!("Loading BLS key pool from {}", BLS_KEY_POOL_PATH);
-        
+
         let content = fs::read_to_string(BLS_KEY_POOL_PATH)
             .with_context(|| format!("Failed to read BLS key pool from {}", BLS_KEY_POOL_PATH))?;
-        
-        let json: Value = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse BLS key pool JSON")?;
-        
+
+        let json: Value =
+            serde_json::from_str(&content).with_context(|| "Failed to parse BLS key pool JSON")?;
+
         let mut pool = HashMap::new();
-        
+
         if let Some(bls_keys) = json.get("bls_keys").and_then(|v| v.as_object()) {
             for (key_id, key_data) in bls_keys {
                 if let Ok(bls_data) = serde_json::from_value::<BLSKeyData>(key_data.clone()) {
@@ -161,29 +224,29 @@ impl Store {
                 }
             }
         }
-        
+
         info!("Loaded {} BLS keys from pool", pool.len());
         Ok(pool)
     }
-    
+
     /// Load the EOA-to-key mapping file
     fn load_eoa_mapping(path: &str) -> Result<HashMap<String, String>> {
         debug!("Loading EOA mapping from {}", path);
-        
+
         let content = fs::read_to_string(path)
             .with_context(|| format!("Failed to read EOA mapping from {}", path))?;
-        
-        let mapping: HashMap<String, String> = serde_json::from_str(&content)
-            .with_context(|| "Failed to parse EOA mapping JSON")?;
-        
+
+        let mapping: HashMap<String, String> =
+            serde_json::from_str(&content).with_context(|| "Failed to parse EOA mapping JSON")?;
+
         info!("Loaded {} EOA mappings", mapping.len());
         Ok(mapping)
     }
-    
+
     /// Get a key pair by EOA address or key ID
     pub fn get_key_pair(&self, identifier: &str) -> Option<&KeyPair> {
         debug!(identifier = %identifier, "Looking up key pair");
-        
+
         // First check if it's a key_N format
         if identifier.starts_with("key_") {
             if let Some(key_pair) = self.key_index.get(identifier) {
@@ -191,39 +254,39 @@ impl Store {
                 return Some(key_pair);
             }
         }
-        
+
         // Fall back to EOA lookup
         let key_pair = self.players.get(identifier);
-        
+
         if key_pair.is_some() {
             debug!(identifier = %identifier, "Key pair found via EOA address");
         } else {
             debug!(identifier = %identifier, "Key pair not found");
         }
-        
+
         key_pair
     }
-    
+
     /// List all key pairs
     pub fn list_key_pairs(&self) -> Vec<&KeyPair> {
         debug!("Listing all key pairs, count: {}", self.players.len());
         self.players.values().collect()
     }
-    
+
     /// List all key pairs as a map including both EOA and key_N indices
     pub fn list_all_keys(&self) -> HashMap<String, &KeyPair> {
         let mut all_keys = HashMap::new();
-        
+
         // Add all EOA mappings
         for (eoa, key_pair) in &self.players {
             all_keys.insert(eoa.clone(), key_pair);
         }
-        
+
         // Add all key_N mappings
         for (key_id, key_pair) in &self.key_index {
             all_keys.insert(key_id.clone(), key_pair);
         }
-        
+
         all_keys
     }
 }
@@ -239,3 +302,4 @@ struct BLSKeyData {
     g2_y_0: String,
     g2_y_1: String,
 }
+
