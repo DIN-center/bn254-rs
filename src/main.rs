@@ -90,8 +90,8 @@ struct Args {
     ///   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": "key_1"
     /// }
     /// 
-    /// If not specified, defaults to "data/eoa-keymap.json"
-    #[arg(short, long, default_value = "data/eoa-keymap.json")]
+    /// If not specified or set to "none", loads all keys from pool without mapping.
+    #[arg(short, long, default_value = "none")]
     db: String,
     
     /// Port to run the web server on
