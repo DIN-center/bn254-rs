@@ -80,7 +80,7 @@ cargo run --bin bn254-rs -- --log-level trace  # Most verbose
 cargo run --bin bn254-rs -- --log-level warn   # Less verbose
 cargo run --bin bn254-rs -- --log-level error  # Errors only
 
-# The service expects a key store file at ./data/players.json
+# The service expects eoa-keymap.json and keys.json in the data directory
 ```
 
 ### Logging and Tracing
@@ -154,7 +154,7 @@ To use with VS Code REST Client extension or similar HTTP clients:
 1. Open `queries.http` in your editor
 2. Ensure the service is running on port 3000
 3. Click "Send Request" on any example
-4. Replace EOA addresses with actual values from your `data/players.json`
+4. Replace EOA addresses with actual values from your `data/eoa-keymap.json`
 
 See [Key Management Design](KeyManagement.md) for detailed architecture and [API Documentation](src/web/README.md) for complete API reference.
 
@@ -225,7 +225,8 @@ bn254-rs/
 │       ├── models.rs   # Request/response models
 │       └── store.rs    # Key storage logic
 ├── data/
-│   └── players.json    # Key store file
+│   ├── eoa-keymap.json # EOA to key mapping
+│   └── keys.json       # BLS key pool
 ├── tests/              # Integration tests
 ├── contracts/          # Solidity contracts
 ├── KeyManagement.md    # Service architecture
@@ -258,7 +259,7 @@ cargo build --release
 
 - Rust 1.70 or later
 - Foundry (for Solidity tests)
-- A valid `data/players.json` file with operator keys
+- A valid `data/eoa-keymap.json` file with EOA to key mappings
 
 ## Maintenance Guide
 
@@ -282,7 +283,7 @@ The web service is organized into distinct modules:
 - **To Change**: Update `server.rs`, README, and notify all clients
 
 #### 2. Key Store Location
-- **Current**: `./data/players.json`
+- **Current**: `./data/eoa-keymap.json` and `./data/keys.json`
 - **Format**: JSON with specific structure (see `store.rs` docs)
 - **To Change**: Update path in `store.rs` and documentation
 
@@ -328,7 +329,7 @@ cargo test
 ```
 
 #### Adding a New Operator Key
-Add to `data/players.json`:
+Add to `data/eoa-keymap.json`:
 ```json
 {
   "new_operator": {
