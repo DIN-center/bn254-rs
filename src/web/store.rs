@@ -27,11 +27,45 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info, trace, warn};
 
-// Default path to the embedded BLS key pool
-const DEFAULT_BLS_KEY_POOL_PATH: &str = "./data/keys.json";
+// Default paths for the embedded BLS key pool
+const DEFAULT_BLS_KEY_POOL_PATH_CONTAINER: &str = "/app/data/keys.json";
+const DEFAULT_BLS_KEY_POOL_PATH_LOCAL: &str = "./data/keys.json";
 // Expected filenames in the data directory
 const EOA_KEYMAP_FILENAME: &str = "eoa-keymap.json";
 const KEYS_FILENAME: &str = "keys.json";
+
+/// Check if we're running inside a Docker container
+fn is_running_in_container() -> bool {
+    // Check for /.dockerenv file (common Docker indicator)
+    if Path::new("/.dockerenv").exists() {
+        return true;
+    }
+    
+    // Check if /proc/1/cgroup mentions docker or containerd
+    if let Ok(cgroup) = fs::read_to_string("/proc/1/cgroup") {
+        if cgroup.contains("docker") || cgroup.contains("containerd") {
+            return true;
+        }
+    }
+    
+    // Check if we're in the /app directory (our container's WORKDIR)
+    if let Ok(current_dir) = std::env::current_dir() {
+        if current_dir.to_str() == Some("/app") {
+            return true;
+        }
+    }
+    
+    false
+}
+
+/// Get the default BLS key pool path based on environment
+fn get_default_bls_pool_path() -> &'static str {
+    if is_running_in_container() {
+        DEFAULT_BLS_KEY_POOL_PATH_CONTAINER
+    } else {
+        DEFAULT_BLS_KEY_POOL_PATH_LOCAL
+    }
+}
 
 /// In-memory store for operator key pairs
 pub struct Store {
@@ -258,14 +292,19 @@ impl Store {
 
     /// Load the BLS key pool from the specified path or default location
     fn load_bls_pool(keys_path: Option<PathBuf>) -> Result<HashMap<String, BLSKeyData>> {
-        let pool_path = keys_path
-            .as_ref()
-            .map(|p| p.to_str().unwrap())
-            .unwrap_or(DEFAULT_BLS_KEY_POOL_PATH);
+        let pool_path = if let Some(path) = keys_path {
+            path.to_string_lossy().into_owned()
+        } else {
+            get_default_bls_pool_path().to_string()
+        };
         
-        debug!("Loading BLS key pool from {}", pool_path);
+        let is_container = is_running_in_container();
+        debug!(
+            "Loading BLS key pool from {} (container: {})",
+            pool_path, is_container
+        );
 
-        let content = fs::read_to_string(pool_path)
+        let content = fs::read_to_string(&pool_path)
             .with_context(|| format!("Failed to read BLS key pool from {}", pool_path))?;
 
         let json: Value =
