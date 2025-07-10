@@ -41,7 +41,7 @@ bn254-rs = "0.1.0"  # Replace with actual version
 ### Key Management Service
 ```bash
 # Run the service
-cargo run --bin bn254-rs
+cargo run -- --data-dir ./data
 
 # Run tests
 cargo test
