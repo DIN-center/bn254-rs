@@ -18,11 +18,10 @@ services:
     volumes:
       # Mount local data directory for persistence
       - ./data:/app/data:ro
-      # Optionally mount custom keys file
-      # - ./custom-keys.json:/app/data/players.json:ro
+      # Data directory contains eoa-keymap.json and keys.json
     command: 
-      - "--db"
-      - "/app/data/players.json"
+      - "--data-dir"
+      - "/app/data"
       - "--port"
       - "3000"
       - "--log-level"

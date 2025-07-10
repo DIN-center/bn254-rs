@@ -2,11 +2,11 @@
 //!
 //! This module manages BLS key pairs by combining:
 //! 1. A static BLS key pool (key_0 through key_49)
-//! 2. An EOA-to-key mapping file passed via --db flag
+//! 2. An EOA-to-key mapping file in the data directory
 //!
 //! ## Workflow
 //! ```
-//! bn254-rs --db /path/to/eoa-keymap.json
+//! bn254-rs --data-dir /path/to/data
 //! ```
 //!
 //! ## EOA Keymap Format
@@ -24,10 +24,14 @@ use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info, trace, warn};
 
-// Path to the embedded BLS key pool
-const BLS_KEY_POOL_PATH: &str = "./data/keys.json";
+// Default path to the embedded BLS key pool
+const DEFAULT_BLS_KEY_POOL_PATH: &str = "./data/keys.json";
+// Expected filenames in the data directory
+const EOA_KEYMAP_FILENAME: &str = "eoa-keymap.json";
+const KEYS_FILENAME: &str = "keys.json";
 
 /// In-memory store for operator key pairs
 pub struct Store {
@@ -38,25 +42,74 @@ pub struct Store {
 }
 
 impl Store {
-    /// Create a new store by loading keys from default JSON file (backward compatibility)
+    /// Create a new store from a data directory
     ///
-    /// This method is kept for backward compatibility but will attempt to use
-    /// the new mapping format if the file contains EOA-to-key mappings.
+    /// The data directory should contain:
+    /// - eoa-keymap.json: EOA to key mappings
+    /// - keys.json: BLS key pool (optional, falls back to default location)
+    pub fn from_data_dir(data_dir: &str) -> Result<Self> {
+        if data_dir.is_empty() || data_dir == "none" {
+            // No data directory specified, load all keys from default pool
+            info!("No data directory specified, loading all keys from default pool");
+            return Self::load_all_from_pool(None);
+        }
+
+        let data_path = Path::new(data_dir);
+        if !data_path.exists() {
+            return Err(anyhow::anyhow!("Data directory does not exist: {}", data_dir));
+        }
+
+        let eoa_keymap_path = data_path.join(EOA_KEYMAP_FILENAME);
+        let keys_path = data_path.join(KEYS_FILENAME);
+
+        // Use keys.json from data directory if it exists, otherwise use default
+        let bls_pool_path = if keys_path.exists() {
+            Some(keys_path)
+        } else {
+            None
+        };
+
+        if !eoa_keymap_path.exists() {
+            return Err(anyhow::anyhow!(
+                "Required file {} not found in data directory: {}",
+                EOA_KEYMAP_FILENAME,
+                data_dir
+            ));
+        }
+
+        // Load with the mapping from the data directory
+        info!("Loading key store from data directory: {}", data_dir);
+        Self::from_mapping(eoa_keymap_path.to_str().unwrap(), bls_pool_path)
+    }
+
+    /// Create a new store by loading keys from a file (backward compatibility)
+    ///
+    /// This method is kept for backward compatibility.
+    /// If the file is an EOA mapping, it uses that.
+    /// Otherwise, it loads all keys from the default pool.
     pub fn from_file(path: &str) -> Result<Self> {
-        // First try to load as EOA mapping
-        match Self::from_mapping(path) {
-            Ok(store) => Ok(store),
-            Err(_) => {
-                // Fall back to loading all keys from pool without mapping
-                warn!("Failed to load as EOA mapping, loading all keys from pool");
-                Self::load_all_from_pool()
+        // First check if it's a path to a directory (new format)
+        if Path::new(path).is_dir() {
+            return Self::from_data_dir(path);
+        }
+        
+        // Try to load as EOA mapping file directly
+        if path != "none" && Path::new(path).exists() {
+            match Self::from_mapping(path, None) {
+                Ok(store) => return Ok(store),
+                Err(_) => {
+                    warn!("Failed to load as EOA mapping, loading all keys from pool");
+                }
             }
         }
+        
+        // Fall back to loading all keys from pool without mapping
+        Self::load_all_from_pool(None)
     }
 
     /// Load all keys from the pool without EOA mapping
-    pub fn load_all_from_pool() -> Result<Self> {
-        let bls_pool = Self::load_bls_pool()?;
+    pub fn load_all_from_pool(keys_path: Option<PathBuf>) -> Result<Self> {
+        let bls_pool = Self::load_bls_pool(keys_path)?;
         let mut players = HashMap::new();
         let mut key_index = HashMap::new();
 
@@ -88,11 +141,12 @@ impl Store {
     ///
     /// ## Arguments
     /// * `mapping_path` - Path to the EOA-to-key mapping JSON file
-    pub fn from_mapping(mapping_path: &str) -> Result<Self> {
+    /// * `keys_path` - Optional path to the keys.json file (uses default if None)
+    pub fn from_mapping(mapping_path: &str, keys_path: Option<PathBuf>) -> Result<Self> {
         info!("Initializing key store with mapping from: {}", mapping_path);
 
         // Load the BLS key pool first
-        let bls_pool = Self::load_bls_pool()?;
+        let bls_pool = Self::load_bls_pool(keys_path)?;
 
         // Load the EOA-to-key mapping
         let eoa_mapping = Self::load_eoa_mapping(mapping_path)?;
@@ -151,7 +205,7 @@ impl Store {
         info!("Deriving 26 accounts from mnemonic");
 
         // Load the BLS key pool first
-        let bls_pool = Self::load_bls_pool()?;
+        let bls_pool = Self::load_bls_pool(None)?;
 
         let mut players = HashMap::new();
         let mut key_index = HashMap::new();
@@ -202,12 +256,17 @@ impl Store {
         Ok(Self { players, key_index })
     }
 
-    /// Load the BLS key pool from the embedded file
-    fn load_bls_pool() -> Result<HashMap<String, BLSKeyData>> {
-        debug!("Loading BLS key pool from {}", BLS_KEY_POOL_PATH);
+    /// Load the BLS key pool from the specified path or default location
+    fn load_bls_pool(keys_path: Option<PathBuf>) -> Result<HashMap<String, BLSKeyData>> {
+        let pool_path = keys_path
+            .as_ref()
+            .map(|p| p.to_str().unwrap())
+            .unwrap_or(DEFAULT_BLS_KEY_POOL_PATH);
+        
+        debug!("Loading BLS key pool from {}", pool_path);
 
-        let content = fs::read_to_string(BLS_KEY_POOL_PATH)
-            .with_context(|| format!("Failed to read BLS key pool from {}", BLS_KEY_POOL_PATH))?;
+        let content = fs::read_to_string(pool_path)
+            .with_context(|| format!("Failed to read BLS key pool from {}", pool_path))?;
 
         let json: Value =
             serde_json::from_str(&content).with_context(|| "Failed to parse BLS key pool JSON")?;
@@ -302,4 +361,3 @@ struct BLSKeyData {
     g2_y_0: String,
     g2_y_1: String,
 }
-

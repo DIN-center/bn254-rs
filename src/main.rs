@@ -8,7 +8,7 @@
 //! The service consists of:
 //! - Web server running on port 3000 (for backward compatibility)
 //! - RESTful API endpoints for key management and signing operations
-//! - In-memory key store loaded from `./data/players.json`
+//! - In-memory key store loaded from data directory (eoa-keymap.json + keys.json)
 //! 
 //! ## Maintenance Notes
 //! 
@@ -35,8 +35,8 @@
 //! # Run with default settings
 //! cargo run --bin bn254-rs
 //! 
-//! # Run with custom EOA mapping file
-//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json
+//! # Run with custom data directory
+//! cargo run --bin bn254-rs -- --data-dir /path/to/data
 //! 
 //! # Run on a different port
 //! cargo run --bin bn254-rs -- --port 8080
@@ -48,7 +48,7 @@
 //! cargo run --bin bn254-rs -- --log-level debug
 //! 
 //! # Run with all custom options
-//! cargo run --bin bn254-rs -- --db /path/to/eoa-keymap.json --host 0.0.0.0 --port 8080 --log-level debug
+//! cargo run --bin bn254-rs -- --data-dir /path/to/data --host 0.0.0.0 --port 8080 --log-level debug
 //! 
 //! # Run with environment variable
 //! RUST_LOG=trace cargo run --bin bn254-rs
@@ -81,18 +81,21 @@ struct Args {
     #[arg(short, long, default_value = "info")]
     log_level: String,
     
-    /// Path to the EOA-to-key mapping JSON file
+    /// Path to the data directory containing key files
     /// 
-    /// This file should map EOA addresses to key IDs (key_0 through key_49).
-    /// Example format:
+    /// The data directory must contain:
+    /// - eoa-keymap.json: Maps EOA addresses to key IDs (key_0 through key_49)
+    /// - keys.json: The BLS key pool
+    /// 
+    /// Example eoa-keymap.json format:
     /// {
     ///   "0x70997970C51812dc3A010C7d01b50e0d17dc79C8": "key_0",
     ///   "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": "key_1"
     /// }
     /// 
-    /// If not specified or set to "none", loads all keys from pool without mapping.
-    #[arg(short, long, default_value = "none")]
-    db: String,
+    /// If not specified or set to "none", loads all keys from default location without mapping.
+    #[arg(short = 'd', long, default_value = "none")]
+    data_dir: String,
     
     /// Port to run the web server on
     /// 
@@ -137,16 +140,16 @@ async fn main() {
     if args.mnemonic.is_some() {
         tracing::info!("Using mnemonic-based key derivation for 26 accounts");
     } else {
-        tracing::info!("Using database file: {}", args.db);
+        tracing::info!("Using data directory: {}", args.data_dir);
     }
     tracing::info!("Server will listen on {}:{}", args.host, args.port);
     
     // Start the web server
     // This will:
-    // 1. Load the key store from the specified database file or derive from mnemonic
+    // 1. Load the key store from the specified data directory or derive from mnemonic
     // 2. Start the HTTP server on the specified address and port
     // 3. Set up all API routes
-    if let Err(e) = web::start_server(&args.db, &args.host, args.port, args.mnemonic).await {
+    if let Err(e) = web::start_server(&args.data_dir, &args.host, args.port, args.mnemonic).await {
         tracing::error!("Error running web service: {}", e);
         std::process::exit(1);
     }
