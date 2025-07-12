@@ -32,6 +32,7 @@ const DEFAULT_BLS_KEY_POOL_PATH_CONTAINER: &str = "/app/data/keys.json";
 const DEFAULT_BLS_KEY_POOL_PATH_LOCAL: &str = "./data/keys.json";
 // Expected filenames in the data directory
 const EOA_KEYMAP_FILENAME: &str = "eoa-keymap.json";
+const EXTERNAL_EOA_KEYMAP_FILENAME: &str = "external-eoa-keymap.json";
 const KEYS_FILENAME: &str = "keys.json";
 
 /// Check if we're running inside a Docker container
@@ -94,6 +95,7 @@ impl Store {
         }
 
         let eoa_keymap_path = data_path.join(EOA_KEYMAP_FILENAME);
+        let external_keymap_path = data_path.join(EXTERNAL_EOA_KEYMAP_FILENAME);
         let keys_path = data_path.join(KEYS_FILENAME);
 
         // Use keys.json from data directory if it exists, otherwise use default
@@ -102,6 +104,12 @@ impl Store {
         } else {
             None
         };
+
+        // Check for external mappings first (higher priority)
+        if external_keymap_path.exists() {
+            info!("Found external EOA keymap, using it for mappings");
+            return Self::from_mapping(external_keymap_path.to_str().unwrap(), bls_pool_path);
+        }
 
         if !eoa_keymap_path.exists() {
             return Err(anyhow::anyhow!(
