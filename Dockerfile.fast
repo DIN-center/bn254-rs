@@ -34,4 +34,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Default command - no mapping file needed by default
 ENTRYPOINT ["txtx-bn254-signer"]
-CMD ["--port", "3000", "--log-level", "info"]
+CMD ["--port", "3000", "--data-dir", "./data", "--log-level", "info"]
