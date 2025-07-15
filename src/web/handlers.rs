@@ -1,39 +1,39 @@
 //! # API Handlers Module
-//! 
+//!
 //! This module contains all HTTP request handlers for the BN254 key management service.
 //! Each handler implements a specific API endpoint with proper error handling and logging.
-//! 
+//!
 //! ## Handler Functions
-//! 
+//!
 //! - `get_key_pair`: Retrieve public key components for an operator
 //! - `list_key_pairs`: List all available key pairs
 //! - `scalar_mul`: Perform scalar multiplication on a G1 point
 //! - `sign`: Sign a message with an operator's BLS private key
 //! - `get_registration_params`: Generate operator registration parameters
-//! 
+//!
 //! ## Maintenance Notes
-//! 
+//!
 //! ### Adding New Handlers
 //! 1. Define the handler function with proper tracing
 //! 2. Use structured logging with tracing macros
 //! 3. Return appropriate HTTP status codes
 //! 4. Add the route in server.rs
-//! 
+//!
 //! ### Error Handling Guidelines
 //! - 400 Bad Request: Invalid input format or parsing errors
 //! - 404 Not Found: Requested key/operator not found
 //! - 500 Internal Server Error: Unexpected processing errors
-//! 
+//!
 //! ### API Format
 //! The `/sign` endpoint:
 //! - Accepts `message` field: 128-char hex string (concatenated x,y coordinates)
 //! - Response uses array format for G2 points
-//! 
+//!
 //! ### Performance Considerations
 //! - All key lookups are O(1) from in-memory HashMap
 //! - Cryptographic operations are the main bottleneck
 //! - Consider adding caching for repeated operations
-//! 
+//!
 //! ## Security Notes
 //! - Private keys never leave the store module
 //! - All inputs are validated before processing
@@ -52,31 +52,31 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use serde_json;
 use hex;
-use tracing::{debug, error, info, trace};
+use serde_json;
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::{debug, error, info, trace};
 // Add these imports for ABI encoding
 use ethers::abi::{encode, Token};
 use ethers::types::{Bytes, U256};
 
 /// Parse a field element from a string
-/// 
+///
 /// Supports multiple formats:
 /// - Hex with 0x prefix: "0x1234abcd..."
 /// - Hex without prefix: "1234abcd..."
 /// - Decimal: "123456789"
-/// 
+///
 /// # Maintenance Notes
-/// 
+///
 /// This function is critical for input parsing. Any changes must maintain:
 /// - Support for both hex formats (with/without 0x)
 /// - Proper error messages for debugging
 /// - Safe handling of arbitrary length inputs
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// let fq = parse_fq_from_str("0x1234")?;
 /// let fq = parse_fq_from_str("1234")?;
@@ -98,7 +98,7 @@ fn parse_fq_from_str(s: &str) -> Result<Fq, String> {
     } else {
         None
     };
-    
+
     if let Some(hex) = is_hex {
         let bytes = match hex::decode(hex) {
             Ok(b) => b,
@@ -152,24 +152,24 @@ fn fq_to_hex_string(fq: &Fq) -> String {
 
 // Function to create a formatted PubkeyRegistrationParams from the response data
 fn create_formatted_params(
-    signature: &G1Point, 
-    g1: &G1Point, 
-    g2: &crate::web::models::G2Point
+    signature: &G1Point,
+    g1: &G1Point,
+    g2: &crate::web::models::G2Point,
 ) -> serde_json::Value {
     use serde_json::json;
-    
+
     // Parse the G1 and G2 points
     let sig_x = Fq::from_str(&signature.x).unwrap_or_else(|_| Fq::zero());
     let sig_y = Fq::from_str(&signature.y).unwrap_or_else(|_| Fq::zero());
-    
+
     let g1_x = Fq::from_str(&g1.x).unwrap_or_else(|_| Fq::zero());
     let g1_y = Fq::from_str(&g1.y).unwrap_or_else(|_| Fq::zero());
-    
+
     let g2_x_a = Fq::from_str(&g2.x_a).unwrap_or_else(|_| Fq::zero());
     let g2_x_b = Fq::from_str(&g2.x_b).unwrap_or_else(|_| Fq::zero());
     let g2_y_a = Fq::from_str(&g2.y_a).unwrap_or_else(|_| Fq::zero());
     let g2_y_b = Fq::from_str(&g2.y_b).unwrap_or_else(|_| Fq::zero());
-    
+
     // Create the formatted JSON structure
     json!({
         "internalType": "struct IBLSApkRegistryTypes.PubkeyRegistrationParams",
@@ -244,14 +244,14 @@ fn create_formatted_params(
 }
 
 /// Health check endpoint
-/// 
+///
 /// Returns service status and key store information
 pub async fn health_check(State(store): State<Arc<Store>>) -> impl IntoResponse {
     debug!("Health check requested");
-    
+
     let key_count = store.list_key_pairs().len();
     let status = if key_count > 0 { "healthy" } else { "degraded" };
-    
+
     Json(serde_json::json!({
         "status": status,
         "service": "bn254-signer",
@@ -412,11 +412,11 @@ pub async fn scalar_mul(
 }
 
 /// Sign a message with BLS private key
-/// 
+///
 /// ## Input Format
 /// - `eoa_address`: Operator's Ethereum address
 /// - `message`: 128-character hex string containing concatenated x,y coordinates (64 chars each)
-/// 
+///
 /// ## Response Format
 /// ```json
 /// {
@@ -426,12 +426,12 @@ pub async fn scalar_mul(
 ///   "abi_encoded_result": "0x..."
 /// }
 /// ```
-/// 
+///
 /// ## Error Cases
 /// - 400: Invalid hex format or length
 /// - 404: EOA address not found
 /// - 500: Private key parsing error
-/// 
+///
 /// ## Example Usage
 /// ```bash
 /// curl -X POST http://localhost:3000/sign \
@@ -489,10 +489,10 @@ pub async fn sign(
         message_len = req.message.len(),
         "Parsing message as concatenated G1 point"
     );
-    
+
     // Remove 0x prefix if present
     let hex_str = req.message.strip_prefix("0x").unwrap_or(&req.message);
-    
+
     // Expect 128 hex chars (64 bytes total)
     if hex_str.len() != 128 {
         error!(
@@ -501,11 +501,11 @@ pub async fn sign(
         );
         return StatusCode::BAD_REQUEST.into_response();
     }
-    
+
     // Split into x and y coordinates (32 bytes each)
     let x_hex = &hex_str[0..64];
     let y_hex = &hex_str[64..128];
-    
+
     let x = match parse_fq_from_str(x_hex) {
         Ok(x) => x,
         Err(e) => {
@@ -513,7 +513,7 @@ pub async fn sign(
             return StatusCode::BAD_REQUEST.into_response();
         }
     };
-    
+
     let y = match parse_fq_from_str(y_hex) {
         Ok(y) => y,
         Err(e) => {
@@ -521,7 +521,7 @@ pub async fn sign(
             return StatusCode::BAD_REQUEST.into_response();
         }
     };
-    
+
     debug!("Successfully parsed message as G1 point");
     let point = G1Projective::new_unchecked(x, y, Fq::one());
 
@@ -555,7 +555,7 @@ pub async fn sign(
             y: signature_affine.y.to_string(),
         },
         g1: key_pair.public_key_g1.clone(),
-        g2: key_pair.public_key_g2.clone().into(),  // Convert to array format
+        g2: key_pair.public_key_g2.clone().into(), // Convert to array format
         // Add the ABI-encoded result
         abi_encoded_result,
     };
@@ -685,14 +685,14 @@ pub async fn get_registration_params(
         x: signature_affine.x.to_string(),
         y: signature_affine.y.to_string(),
     };
-    
+
     // Create the formatted params structure
     let formatted_params = create_formatted_params(
         &signature_g1,
         &key_pair.public_key_g1,
-        &key_pair.public_key_g2
+        &key_pair.public_key_g2,
     );
-    
+
     // Create response with all parameters
     let response = RegistrationParamsResponse {
         signature: signature_g1,
