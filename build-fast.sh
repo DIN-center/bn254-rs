@@ -11,8 +11,8 @@ cargo build --release --bin txtx-bn254-signer
 cp target/release/txtx-bn254-signer .
 
 echo "🐳 Building Docker image with pre-built binary..."
-docker build -t bn254-rs:latest -f Dockerfile.fast .
-
+# docker build -t bn254-rs:latest -f Dockerfile.fast .
+docker build -t din-bn254:latest -f Dockerfile.fast .
 # Clean up
 rm -f txtx-bn254-signer
 
