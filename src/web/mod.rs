@@ -16,7 +16,7 @@ pub async fn start_server() -> std::io::Result<()> {
     };
     let store = web::Data::new(store);
 
-    info!("Starting server at http://127.0.0.1:8080");
+    info!("Starting server at http://0.0.0.0:8080");
     
     HttpServer::new(move || {
         App::new()
@@ -29,7 +29,7 @@ pub async fn start_server() -> std::io::Result<()> {
                     .route("/sign", web::post().to(handlers::sign))
             )
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:8080")?
     .run()
     .await
 } 
