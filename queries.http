@@ -1,0 +1,156 @@
+# BN254 Key Management Service API Test Harness
+# 
+# This file contains test requests for the BN254 key management service.
+# Make sure the service is running on port 3000 before executing these requests.
+#
+# To start the service:
+# cargo run --bin bn254-rs
+
+### Health Check - List all available key pairs
+GET http://localhost:3000/keys
+Content-Type: application/json
+
+###
+
+### Get a specific key pair by EOA address
+# Replace with an actual EOA address from your data/players.json
+GET http://localhost:3000/key/0xB364F96672D035a53c1E0A85A93F4605aeB62c2b
+Content-Type: application/json
+
+###
+
+### Perform scalar multiplication
+# Multiplies a G1 point (hash_x, hash_y) by the operator's private key
+POST http://localhost:3000/scalar_mul
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "hash_x": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+  "hash_y": "0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
+}
+
+###
+
+### Scalar multiplication with decimal values
+#Should fail
+POST http://localhost:3000/scalar_mul
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "hash_x": "5",
+  "hash_y": "7"
+}
+
+###
+
+### Sign a message (concatenated G1 point)
+# Message should be 128 hex chars: first 64 for x coordinate, last 64 for y coordinate
+POST http://localhost:3000/sign
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "message": "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdeffedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
+}
+
+###
+
+### Sign a message with 0x prefix
+POST http://localhost:3000/sign
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "message": "0x274231a23b4ae1cc8913e2287ad7f8603d64450580cb7344695d4511c5779e4905fde64191cfc3cf724a42eb4388d3944bd87630209a57bc5cfe9d2c9c4733a9"
+}
+
+###
+
+### Get registration parameters
+# Used for operator registration with EigenLayer AVS
+POST http://localhost:3000/registration_params
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "message_hash": "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+}
+
+###
+
+### Registration parameters with actual AVS data
+POST http://localhost:3000/registration_params
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "message_hash": "0x274231a23b4ae1cc8913e2287ad7f8603d64450580cb7344695d4511c5779e49"
+}
+
+###
+
+### Error Case - Non-existent EOA address
+GET http://localhost:3000/key/0x0000000000000000000000000000000000000000
+Content-Type: application/json
+
+###
+
+### Error Case - Invalid message length (should be 128 hex chars)
+POST http://localhost:3000/sign
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "message": "123456"
+}
+
+###
+
+### Error Case - Missing required fields
+POST http://localhost:3000/sign
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b"
+}
+
+###
+
+### Debug - Run with trace logging to see detailed request processing
+# Start service with: cargo run --bin bn254-rs -- --log-level trace
+# Then execute any of the above requests to see detailed logging
+
+### Performance Test - Multiple rapid requests
+POST http://localhost:3000/scalar_mul
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "hash_x": "1",
+  "hash_y": "2"
+}
+
+###
+
+POST http://localhost:3000/scalar_mul
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "hash_x": "3",
+  "hash_y": "4"
+}
+
+###
+
+POST http://localhost:3000/scalar_mul
+Content-Type: application/json
+
+{
+  "eoa_address": "0xB364F96672D035a53c1E0A85A93F4605aeB62c2b",
+  "hash_x": "5",
+  "hash_y": "6"
+}
+

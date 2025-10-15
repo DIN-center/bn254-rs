@@ -1,61 +1,73 @@
-# Multi-stage build for bn254-rs
-FROM rust:1.81-slim as builder
+# Multi-stage build for txtx-bn254-signer
+# Stage 1: Build dependencies
+FROM rust:1.83-alpine AS dependencies
 
-# Install dependencies for building
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apk add --no-cache musl-dev
 
-# Create app directory
+# Create a new empty project
+WORKDIR /usr/src
+RUN USER=root cargo new --bin app
 WORKDIR /usr/src/app
 
-# Copy Cargo files
+# Copy manifests
 COPY Cargo.toml Cargo.lock ./
 
+# Build dependencies - this is the caching layer
+RUN cargo build --release --bin txtx-bn254-signer
+RUN rm -f src/*.rs target/release/deps/txtx_bn254_signer* || true
+
+# Stage 2: Build application
+FROM rust:1.83-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache musl-dev
+
+WORKDIR /usr/src/app
+
+# Copy dependencies from previous stage
+COPY --from=dependencies /usr/src/app/target target
+COPY --from=dependencies /usr/local/cargo /usr/local/cargo
+
 # Copy source code
+COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-COPY contracts ./contracts
-COPY testdata ./testdata
-COPY tests ./tests
-COPY foundry.toml ./
 
-# Build the application in release mode
-RUN cargo build --release --bin bn254-rs
+# Build the application
+RUN cargo build --release --bin txtx-bn254-signer
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Stage 3: Runtime
+FROM alpine:3.19
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     ca-certificates \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -u 1001 appuser
+    libgcc \
+    && addgroup -g 1000 app \
+    && adduser -u 1000 -G app -D app
 
 # Copy the binary from builder
-COPY --from=builder /usr/src/app/target/release/bn254-rs /usr/local/bin/bn254-rs
+COPY --from=builder /usr/src/app/target/release/txtx-bn254-signer /usr/local/bin/txtx-bn254-signer
 
-# Create directory for data files
-RUN mkdir -p /home/appuser/src/web
+# Create data directory
+RUN mkdir -p /app/data && chown -R app:app /app
 
-# Copy the players.json file
-COPY --chown=appuser:appuser src/web/players.json /home/appuser/src/web/players.json
+WORKDIR /app
+
+# Copy required data files
+COPY --chown=app:app data/keys.json /app/data/keys.json
+COPY --chown=app:app data/eoa-keymap.json /app/data/eoa-keymap.json
 
 # Switch to non-root user
-USER appuser
+USER app
 
-# Set working directory
-WORKDIR /home/appuser
-
-# Expose port
+# Expose the default port
 EXPOSE 8080
 
-# Set environment variables
-ENV RUST_LOG=info
-ENV PORT=8080
+# Health check - using /health endpoint
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
 
-# Run the binary
-CMD ["bn254-rs"]
+# Default command - no mapping file needed by default
+ENTRYPOINT ["txtx-bn254-signer"]
+CMD ["--port", "8080", "--data-dir", "./data", "--log-level", "info"]
