@@ -54,19 +54,20 @@ RUN mkdir -p /app/data && chown -R app:app /app
 
 WORKDIR /app
 
-# Copy BLS key pool
+# Copy BLS key pool and EOA mapping
 COPY --chown=app:app data/keys.json /app/data/keys.json
+COPY --chown=app:app data/eoa-keymap.json /app/data/eoa-keymap.json
 
 # Switch to non-root user
 USER app
 
 # Expose the default port
-EXPOSE 3000
+EXPOSE 8080
 
-# Health check - using /keys endpoint as a simple health check
+# Health check - using /health endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/keys || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/health || exit 1
 
 # Default command - no mapping file needed by default
 ENTRYPOINT ["txtx-bn254-signer"]
-CMD ["--port", "3000", "--data-dir", "./data", --log-level", "info"]
+CMD ["--port", "8080", "--data-dir", "./data", "--log-level", "info"]
