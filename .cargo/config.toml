@@ -1,2 +1,27 @@
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+[build]
+# Use all available CPU cores for parallel compilation
+jobs = 22
+
+# Incremental compilation for faster rebuilds
+incremental = true
+
+[profile.dev]
+# Optimize dependencies even in dev mode for faster execution
+opt-level = 1
+# Keep debug info for better debugging
+debug = true
+# Faster compile times with lower optimization
+incremental = true
+
+[profile.release]
+# Full optimization for release builds
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+
 [alias]
 test-fuzz = "test --test prop_scalar_mul -- --nocapture"

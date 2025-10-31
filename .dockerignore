@@ -1,0 +1,75 @@
+# Git files
+.git
+.gitignore
+.github
+
+# Build artifacts
+target/
+out/
+build/
+dist/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+LICENSE*
+docs/
+
+# Test files
+tests/
+testdata/
+*.test
+
+# Development files
+.env
+.env.*
+docker-compose.override.yml
+Dockerfile.dev
+
+# Rust specific
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Foundry/Solidity files (not needed for runtime)
+contracts/
+foundry.toml
+cache/
+artifacts/
+
+# Development and debug files
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output
+
+# Benchmarking
+benches/
+criterion.rs
+
+# Query and development files
+queries.http
+todo.md
+
+# Keep only essential files for the build
+!Cargo.toml
+!Cargo.lock
+!src/
+!data/players.json
