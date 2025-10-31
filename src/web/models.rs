@@ -164,9 +164,11 @@ pub struct G2PointArray {
 
 impl From<G2Point> for G2PointArray {
     fn from(p: G2Point) -> Self {
+        // EigenLayer/Ethereum expects G2 coordinates in reversed order:
+        // [imaginary, real] instead of [real, imaginary]
         G2PointArray {
-            x: [p.x_a, p.x_b],
-            y: [p.y_a, p.y_b],
+            x: [p.x_b, p.x_a],  // [c1, c0] = [imaginary, real]
+            y: [p.y_b, p.y_a],  // [c1, c0] = [imaginary, real]
         }
     }
 }
