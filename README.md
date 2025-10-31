@@ -41,18 +41,14 @@ bn254-rs = "0.1.0"  # Replace with actual version
 
 ### Key Management Service
 ```bash
-# Quick start - derivation mode with random salt (recommended)
-make serve
-
-# Or with custom salt
+# Recommended: derivation mode with salt (generates deterministic keys)
 export BN254_SALT=$(openssl rand -hex 32)
 cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
 
-# Or with static key pool
-cargo run --bin txtx-bn254-signer -- --data-dir ./data
+# Or quick start with random salt
+make serve
 
 # Run tests
-make test-quick   # Validate signatures cryptographically
 cargo test        # Run all Rust tests
 ```
 
@@ -73,31 +69,24 @@ See [KEY_DERIVATION.md](KEY_DERIVATION.md) for detailed key derivation documenta
 The Key Management Service is a proof-of-concept web service that demonstrates separation of concerns for managing BLS key pairs used by EigenLayer AVS operators.
 
 ### Features
-- **Three Operation Modes**:
-  - **Derivation Mode** (recommended): On-demand key derivation from EOA + salt
-  - **Static Pool Mode**: Pre-generated keys from key pool
-  - **Mnemonic Mode**: HD wallet-based key derivation (BIP39/44)
+- **Derivation Mode** (recommended): On-demand key derivation from EOA + salt
+- **Static Pool Mode**: Pre-generated keys from key pool (legacy)
 - RESTful API for key management operations
 - BLS signing operations with cryptographically validated signatures
 - Scalar multiplication support
-- Registration parameter generation
-- Validation suite with Python test framework
 
 ### Running the Service
 
 ```bash
-# Quick start - derivation mode with random salt
-make serve
-
-# Derivation mode - with custom salt
+# Recommended: derivation mode with salt
 export BN254_SALT=$(openssl rand -hex 32)
 cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
 
-# Static pool mode - requires data directory
-cargo run --bin txtx-bn254-signer -- --data-dir ./data
+# Or quick start with random salt
+make serve
 
-# Mnemonic mode - HD wallet
-cargo run --bin txtx-bn254-signer -- --mnemonic "your twelve word mnemonic phrase here"
+# Legacy: static pool mode (requires data directory)
+cargo run --bin txtx-bn254-signer -- --data-dir ./data
 
 # Start with custom log level (default: info)
 cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --log-level debug
@@ -133,9 +122,6 @@ cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --log-level trace
 - `POST /scalar_mul` - Perform scalar multiplication
 - `POST /sign` - Sign a message hash with BLS
 
-#### Registration
-- `POST /registration_params` - Generate registration parameters for an operator
-
 ### Example Usage
 
 ```bash
@@ -143,24 +129,15 @@ cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --log-level trace
 curl http://localhost:3000/key/0x70997970C51812dc3A010C7d01b50e0d17dc79C8
 
 # Sign a message (message must be a valid G1 curve point)
-# Use test.py to generate valid test messages
 curl -X POST http://localhost:3000/sign \
   -H "Content-Type: application/json" \
   -d '{
     "eoa_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
     "message": "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002"
   }'
-
-# Get registration parameters
-curl -X POST http://localhost:3000/registration_params \
-  -H "Content-Type: application/json" \
-  -d '{
-    "eoa_address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-    "message_hash": "0x1234567890abcdef..."
-  }'
 ```
 
-**Important**: The `/sign` endpoint requires the `message` to be a **valid BN254 G1 curve point** (128 hex characters representing x,y coordinates). Use the included Python test suite to generate valid test messages.
+**Important**: The `/sign` endpoint requires the `message` to be a **valid BN254 G1 curve point** (128 hex characters representing x,y coordinates).
 
 ### Testing with HTTP Client
 
@@ -184,34 +161,7 @@ To use with VS Code REST Client extension or similar HTTP clients:
 
 See [Key Management Design](KeyManagement.md) for detailed architecture and [API Documentation](src/web/README.md) for complete API reference.
 
-### Testing and Validation
-
-#### Python Validation Suite
-
-The project includes a Python-based validation suite that verifies cryptographic correctness:
-
-```bash
-# Quick validation - checks curve points and BLS pairing
-make test-quick
-
-# Full diagnostic mode - includes format analysis
-make test-validate
-
-# Test signing endpoint
-make test-sign
-
-# Direct Python usage
-python test.py --quick
-python test.py --server http://localhost:3000 --eoa 0x...
-```
-
-The validation suite verifies:
-- ✅ Signature coordinates are valid BN254 curve points
-- ✅ Public key coordinates are valid BN254 curve points
-- ✅ BLS pairing equation: `e(message, pubkey_g2) == e(signature, G2)`
-- ✅ Proper affine-to-projective coordinate conversion
-
-**Requirements**: Python 3.10+, install dependencies with `pip install -r requirements.txt`
+### Testing
 
 #### Rust Tests
 
@@ -259,52 +209,6 @@ This works because of bilinearity:
 - Rust tests: `tests/key_validation.rs`
 - Uses local Anvil instance for testing against the pairing precompile
 
-### API Request/Response Formats
-
-#### POST /scalar_mul
-Performs scalar multiplication of a G1 point with the operator's private key.
-
-Request:
-```json
-{
-  "eoa_address": "0x...",
-  "hash_x": "0x...",  // X coordinate of the G1 point
-  "hash_y": "0x..."   // Y coordinate of the G1 point
-}
-```
-
-#### POST /sign
-Signs a message with the operator's BLS private key.
-
-Request:
-```json
-{
-  "eoa_address": "0x...",
-  "message": "0x..."  // 128-char hex string: concatenated x,y coordinates (64 chars each)
-}
-```
-
-Response:
-```json
-{
-  "signature": { "x": "0x...", "y": "0x..." },
-  "g1": { "x": "0x...", "y": "0x..." },
-  "g2": { "x": ["0x...", "0x..."], "y": ["0x...", "0x..."] },
-  "abi_encoded_result": "0x..."
-}
-```
-
-#### POST /registration_params
-Generates registration parameters for an operator, including signing a message hash.
-
-Request:
-```json
-{
-  "eoa_address": "0x...",
-  "message_hash": "0x..."  // The message hash to sign
-}
-```
-
 ## Development
 
 ### Repository Structure
@@ -326,13 +230,11 @@ bn254-rs/
 │       ├── handlers.rs # API endpoint handlers
 │       ├── models.rs   # Request/response models
 │       └── store.rs    # Key storage and derivation logic
-├── data/
-│   ├── eoa-keymap.json # EOA to key mapping (static mode)
-│   └── keys.json       # BLS key pool (static mode)
+├── data/               # Sample data for static pool mode (legacy)
+│   ├── eoa-keymap.json # EOA to key mapping
+│   └── keys.json       # BLS key pool
 ├── tests/              # Integration tests
 ├── contracts/          # Solidity contracts
-├── test.py             # Python validation suite
-├── requirements.txt    # Python dependencies
 ├── Makefile            # Build and test targets
 ├── KeyManagement.md    # Service architecture
 ├── KEY_DERIVATION.md   # Key derivation mode guide
@@ -345,9 +247,6 @@ bn254-rs/
 # Install Rust dependencies
 cargo build
 
-# Install Python dependencies (for validation suite)
-pip install -r requirements.txt
-
 # Run all Rust tests
 cargo test
 
@@ -357,12 +256,9 @@ cargo test --test operators      # Operator tests
 cargo test --test signature      # Signature tests
 cargo test --test solidity       # Solidity compatibility tests
 
-# Run the web service
-make serve                       # Quick start with derivation mode
-
-# Run validation tests
-make test-quick                  # Cryptographic validation
-make test-validate               # Full diagnostics
+# Run the web service (recommended: salt mode)
+export BN254_SALT=$(openssl rand -hex 32)
+cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
 
 # Build for release
 cargo build --release --bin txtx-bn254-signer
@@ -372,9 +268,7 @@ cargo build --release --bin txtx-bn254-signer
 
 - **Rust**: 1.70 or later
 - **Foundry**: For Solidity tests
-- **Python**: 3.10+ with `py-ecc` for validation suite
 - **mold linker**: Recommended for faster Linux builds (auto-configured)
-- **Optional**: `data/eoa-keymap.json` and `data/keys.json` for static pool mode
 
 ## Maintenance Guide
 
@@ -471,23 +365,19 @@ cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --log-level trace
 curl -v http://localhost:3000/sign \
   -H "Content-Type: application/json" \
   -d '{"eoa_address":"0x70997970C51812dc3A010C7d01b50e0d17dc79C8", "message":"..."}'
-
-# Validate signatures cryptographically
-make test-quick
 ```
 
 ### Security Considerations
 
-1. **Derivation Mode**:
+1. **Derivation Mode** (recommended):
    - Salt is single point of failure - store securely (secrets manager, vault)
    - Never commit salt to version control
    - Use high-entropy salts (32+ bytes)
-2. **Static Pool Mode**:
+2. **Static Pool Mode** (legacy):
    - Private keys stored in plaintext JSON - ensure strict file permissions
    - Keys can be individually rotated
 3. **Input Validation**: All hex strings and curve points validated before processing
 4. **Memory Safety**: Derived keys cached in memory with thread-safe RwLock
-5. **Cryptographic Validation**: Use `make test-quick` to verify signature correctness
 
 See [KEY_DERIVATION.md](KEY_DERIVATION.md) for detailed security recommendations.
 

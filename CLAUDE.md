@@ -23,13 +23,12 @@ cargo test --test solidity       # Solidity compatibility tests
 cargo test --test prop_scalar_mul # Property-based tests
 
 # Run the web service (Key Management Service)
-cargo run --bin txtx-bn254-signer
+# Recommended: use salt-based derivation mode
+export BN254_SALT=$(openssl rand -hex 32)
+cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
 
-# Run with custom data directory
+# Legacy: static pool mode with data directory
 cargo run --bin txtx-bn254-signer -- --data-dir /path/to/data
-
-# Run with legacy database file (backward compatibility)
-cargo run --bin txtx-bn254-signer -- --data-dir /path/to/eoa-keymap.json
 
 # Run on a different port (default: 3000)
 cargo run --bin txtx-bn254-signer -- --port 8080
@@ -95,29 +94,24 @@ The Key Management Service provides:
 - `GET /keys` - List all public keys
 - `POST /scalar_mul` - Perform scalar multiplication
 - `POST /sign` - Sign a message hash with BLS
-- `POST /registration_params` - Generate registration parameters
 
 See `queries.http` for example requests and `src/web/README.md` for full API documentation.
 
 ## Important Notes
 
 1. **Security**: This is a proof-of-concept demonstrating architectural patterns. It does NOT provide production security guarantees.
-2. **Key Store**: Uses `--data-dir` to load:
-   - `eoa-keymap.json`: Maps EOA addresses to key indices (key_0 through key_49)
-   - `keys.json`: BLS key pool with 50 pre-generated keys
-   - `external-eoa-keymap.json`: Optional override mappings (higher priority)
-3. **Port**: Service runs on port 3000 by default (configurable via `--port`)
-4. **Host**: Service binds to `0.0.0.0` by default (all interfaces). Use `--host 127.0.0.1` for localhost-only
-5. **Logging**: Use `--log-level` or `RUST_LOG` for debugging
-6. **Binary Name**: The executable is named `txtx-bn254-signer` (previously `bn254-rs`)
-7. **Docker Support**: Full Docker and docker-compose support with health checks and multi-stage builds
-8. **Version**: Current version is 0.1.1 (see CHANGELOG.md for release history)
+2. **Key Derivation** (recommended): Use `--salt` to derive keys deterministically from EOA + salt
+3. **Key Store** (legacy): Uses `--data-dir` to load pre-generated keys from `keys.json` and `eoa-keymap.json`
+4. **Port**: Service runs on port 3000 by default (configurable via `--port`)
+5. **Host**: Service binds to `0.0.0.0` by default (all interfaces). Use `--host 127.0.0.1` for localhost-only
+6. **Logging**: Use `--log-level` or `RUST_LOG` for debugging
+7. **Binary Name**: The executable is named `txtx-bn254-signer`
+8. **Docker Support**: Full Docker and docker-compose support with health checks and multi-stage builds
 
-## Key Loading Process
+## Key Derivation (Recommended)
 
-1. Service starts with `--data-dir /path/to/data`
-2. Loads BLS key pool from `keys.json` (50 keys: key_0 through key_49)
-3. Loads EOA mappings from `eoa-keymap.json` 
-4. If `external-eoa-keymap.json` exists, it overrides base mappings
-5. Creates mapping: EOA address → BLS key pair
-6. Logs "Loaded X BLS keys from pool" and "Key store initialized with Y mappings"
+When using `--salt`:
+1. Keys are derived on-demand: `BLS_Key = DeriveKey(Keccak256(EOA || ":" || Salt))`
+2. Same EOA + salt always produces the same key
+3. Keys are cached in memory after first derivation
+4. No key files needed - just store the salt securely

@@ -96,34 +96,26 @@ export BN254_SALT="dev-salt-not-for-production"
 cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
 ```
 
-## Comparison: Three Modes
+## Comparison: Operation Modes
 
-### 1. Derivation Mode (NEW)
+### 1. Derivation Mode (Recommended)
 ```bash
 cargo run --bin txtx-bn254-signer -- --salt "secret-salt"
 ```
 - ✅ Scales to unlimited EOAs
 - ✅ No key files to manage
-- ⚠️ Salt is single point of failure
+- ✅ Deterministic: same EOA + salt = same key
+- ⚠️ Salt is single point of failure - store securely
 - **Use when**: Need to support many dynamic EOAs
 
-### 2. Static Pool Mode (Original)
+### 2. Static Pool Mode (Legacy)
 ```bash
 cargo run --bin txtx-bn254-signer -- --data-dir ./data
 ```
 - ✅ Pre-generated random keys
 - ✅ Keys can be individually rotated
 - ❌ Limited to pool size (50 keys)
-- **Use when**: Fixed set of EOAs, maximum security
-
-### 3. Mnemonic Mode
-```bash
-cargo run --bin txtx-bn254-signer -- --mnemonic "your mnemonic phrase"
-```
-- ✅ HD wallet standard (BIP39/44)
-- ✅ Derives 26 keys
-- ⚠️ Mnemonic is single point of failure
-- **Use when**: Want HD wallet compatibility
+- **Use when**: Fixed set of EOAs, need individual key rotation
 
 ## Migration Guide
 
@@ -161,9 +153,9 @@ cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --port 3001
 - Ensure no typos in EOA address (case-sensitive after 0x prefix is removed and lowercased)
 
 ### Signature validation fails
-- Ensure message is a valid G1 curve point (use `test.py` to generate valid test points)
+- Ensure message is a valid G1 curve point
 - Verify coordinates are in affine form (not projective)
-- Run `make test-quick` to validate the implementation
+- Run `cargo test --test key_validation` to validate key pairs
 
 ### Performance concerns
 - First key derivation takes ~1-2ms
@@ -172,26 +164,18 @@ cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT" --port 3001
 
 ## Testing
 
-### Python Validation Suite
+### Rust Tests
 
-Run the validation suite:
 ```bash
-# Quick validation (curve points + BLS pairing)
-make test-quick
+# Run all tests
+cargo test
 
-# Full diagnostics (includes format analysis)
-make test-validate
+# Run key validation tests (verifies BLS pairing)
+cargo test --test key_validation
 
-# Or directly with Python
-python test.py --quick
-python test.py --server http://localhost:3000
+# Run integration tests
+cargo test --test integration
 ```
-
-This verifies:
-- Signature coordinates are valid BN254 curve points
-- Public key coordinates are valid BN254 curve points
-- BLS pairing equation: `e(message, pubkey_g2) == e(signature, G2)`
-- Cryptographic correctness of the implementation
 
 ### Manual Testing
 
@@ -327,7 +311,7 @@ let affine_point = G1Affine::new_unchecked(x, y);
 let point = G1Projective::from(affine_point);
 ```
 
-**Validation**: Run `make test-quick` to verify signatures pass BLS pairing verification.
+**Validation**: Run `cargo test --test key_validation` to verify key pairs pass BLS pairing verification.
 
 ## Future Improvements
 

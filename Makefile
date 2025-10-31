@@ -8,14 +8,16 @@ docker-latest: ## make `latest` docker image (full build in container)
 docker-fast: ## make `latest` docker image using host-built binary (faster)
 	./build-fast.sh
 
-
 clean: ## clean project
 	cargo clean
 
 build: ## build project
 	cargo build --bin txtx-bn254-signer
 
-serve: ## start server with random salt
+test: ## run all tests
+	cargo test
+
+serve: ## start server with random salt (recommended mode)
 	@SALT=$$(openssl rand -hex 32) && \
 	echo "Starting server with salt: $$SALT" && \
 	cargo run --bin txtx-bn254-signer -- --salt "$$SALT"
@@ -29,12 +31,6 @@ test-sign: ## test sign endpoint with curl
 	    \"eoa_address\": \"$$EOA\", \
 	    \"message\": \"$$MSG_HASH\" \
 	  }" | jq .
-
-test-validate: ## validate signature cryptographically with Python (full diagnostics)
-	@bash -c "source .venv/bin/activate && python test.py"
-
-test-quick: ## quick validation - only check curve points and pairing
-	@bash -c "source .venv/bin/activate && python test.py --quick"
 
 
 

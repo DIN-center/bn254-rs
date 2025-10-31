@@ -2,9 +2,22 @@
 
 ## Overview
 
-This document describes the API for the BN254 Key Management Service, a proof-of-concept implementation demonstrating separation of concerns for key management operations. This service is designed to show how key management can be isolated from other system components, establishing a foundation for future security enhancements.
+This document describes the API for the BN254 Key Management Service, a proof-of-concept implementation demonstrating separation of concerns for key management operations.
 
-> **Important Note**: This is a proof-of-concept implementation that demonstrates architectural patterns for separation of concerns. It does NOT provide production-level security guarantees. The current implementation is for demonstration purposes only.
+> **Important Note**: This is a proof-of-concept implementation. It does NOT provide production-level security guarantees.
+
+## Quick Start
+
+```bash
+# Recommended: use salt-based key derivation
+export BN254_SALT=$(openssl rand -hex 32)
+cargo run --bin txtx-bn254-signer -- --salt "$BN254_SALT"
+
+# Or use make
+make serve
+```
+
+> **Important**: The salt must be stored securely as a secret to maintain determinism. The same salt + EOA address will always produce the same BLS key. If you lose the salt, you lose the ability to regenerate the keys.
 
 ## API Endpoints
 
@@ -12,13 +25,10 @@ This document describes the API for the BN254 Key Management Service, a proof-of
 
 #### Get Public Key for EOA
 ```
-GET /api/keys/{eoa_address}
+GET /key/{eoa_address}
 ```
 
-Returns the public key components for a given EOA address.
-
-**Parameters:**
-- `eoa_address` (path): The Ethereum address of the operator
+Returns the public key components for a given EOA address. In derivation mode, keys are generated on-demand.
 
 **Response:**
 ```json
@@ -36,121 +46,63 @@ Returns the public key components for a given EOA address.
 
 #### List All Public Keys
 ```
-GET /api/keys
+GET /keys
 ```
 
-Returns public key components for all registered EOAs.
-
-**Response:**
-```json
-{
-  "keys": [
-    {
-      "eoa": "0x1234...",
-      "g1": {
-        "x": "0x1234...",
-        "y": "0x5678..."
-      },
-      "g2": {
-        "x": ["0xabcd...", "0xefgh..."],
-        "y": ["0xijkl...", "0xmnop..."]
-      }
-    }
-  ]
-}
-```
+Returns public key components for all cached/loaded EOAs.
 
 ### Signing Operations
 
-#### Sign Data
+#### Sign Message
 ```
-POST /api/sign
+POST /sign
 ```
 
-Signs data using the private key associated with the provided EOA.
+Signs a message (G1 curve point) using the BLS private key for the provided EOA.
 
 **Request Body:**
 ```json
 {
-  "eoa": "0x1234...",
-  "hash": {
-    "x": "0x1234...",
-    "y": "0x5678..."
-  }
+  "eoa_address": "0x1234...",
+  "message": "00...00"  // 128 hex chars (64 bytes = x,y coordinates)
 }
 ```
 
 **Response:**
 ```json
 {
-  "signature": {
-    "x": "0x1234...",
-    "y": "0x5678..."
-  }
+  "signature": { "x": "0x...", "y": "0x..." },
+  "g1": { "x": "0x...", "y": "0x..." },
+  "g2": { "x": ["0x...", "0x..."], "y": ["0x...", "0x..."] }
 }
 ```
 
 #### Scalar Multiplication
 ```
-POST /api/scalar_mul
+POST /scalar_mul
 ```
 
-Performs scalar multiplication on a G1 point using the private key associated with the provided EOA.
+Performs scalar multiplication on a G1 point using the private key.
 
 **Request Body:**
 ```json
 {
-  "eoa": "0x1234...",
-  "point": {
-    "x": "0x1234...",
-    "y": "0x5678..."
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "result": {
-    "x": "0x1234...",
-    "y": "0x5678..."
-  }
+  "eoa_address": "0x1234...",
+  "hash_x": "0x1234...",
+  "hash_y": "0x5678..."
 }
 ```
 
 ## Architecture
 
-The service is designed with separation of concerns in mind:
+The service supports two operation modes:
 
-1. **Key Storage**: Keys are stored separately from the application logic
-2. **Signing Operations**: Cryptographic operations are isolated in a dedicated service
-3. **API Interface**: Clean API boundaries for future security enhancements
-
-This architecture demonstrates the pattern needed for a secure key management system, though the current implementation does not provide production-level security guarantees.
-
-## Development Setup
-
-### Building
-```bash
-cargo build
-```
-
-### Running
-```bash
-cargo run --bin bn254-key-service
-```
-
-### Testing
-```bash
-cargo test
-```
+1. **Derivation Mode** (recommended): Keys derived on-demand from EOA + salt
+2. **Static Pool Mode** (legacy): Pre-generated keys from JSON files
 
 ## Security Notes
 
-This proof-of-concept implementation:
-- Demonstrates separation of concerns for key management
-- Shows how cryptographic operations can be isolated
-- Establishes patterns for future security enhancements
-- Does NOT provide production-level security guarantees
-
-For a production implementation, additional security measures would be required as outlined in [FutureConsiderations.md](../../FutureConsiderations.md).
+- This is a proof-of-concept - NOT production-ready
+- In derivation mode, the salt is the master secret - store it securely (e.g., secrets manager, vault)
+- Never commit the salt to version control
+- See [FutureConsiderations.md](../../FutureConsiderations.md) for security roadmap
