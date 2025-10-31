@@ -27,6 +27,7 @@ pub mod g2;
 pub mod pairing;
 pub mod hash;
 pub mod utils;
+pub mod keygen;
 pub mod web;
 
 // Re-export the main types
@@ -35,4 +36,5 @@ pub use g2::{G2Point, g2_generator, g2_negate};
 pub use pairing::{pairing_check, pairing_check_raw};
 pub use hash::{hash_g1_point, hash_g1_point_raw};
 pub use utils::fr_to_be_bytes;
+pub use keygen::{derive_key_from_eoa, derive_key_from_eoa_hkdf};
 
