@@ -1,1 +1,6 @@
 /target
+/out
+/cache
+*.log
+/data/devnet-mapping.json
+/data/eoa-keymap.json
